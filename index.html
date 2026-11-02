@@ -1475,5 +1475,221 @@ document.getElementById('theme').onclick=()=>{ root.classList.toggle('dark'); tr
 syncScope(); render(); spy();
 }
 </script>
+<script>
+/* 企業カルテ（本番・2026-11-02）：サイドドロワーの会社名をクリック → HubSpotへ飛ばず、カルテのドロワーを重ねて開く。
+   中身は GAS（?karte=HubSpot会社ID）から1社分だけ取る（HubSpotの会社・接点・コンタクト、CS管理、アンケート回答） */
+(function(){
+  document.head.insertAdjacentHTML('beforeend', `<style>
+  .kt-drawer{ position:fixed; inset:0; z-index:95; background:rgba(10,25,45,.30); }
+  .kt-box{ position:absolute; right:0; top:0; bottom:0; width:min(760px,94vw); background:var(--page,#f6f8fb); overflow:auto; box-shadow:-20px 0 50px rgba(0,0,0,.28); transform:translateX(100%); transition:transform .28s cubic-bezier(.2,.8,.2,1); }
+  .kt-drawer.in .kt-box{ transform:none; }
+  .kt-head{ position:sticky; top:0; z-index:2; background:var(--surface); border-bottom:1px solid var(--hair); padding:14px 20px 12px; }
+  .kt-back{ cursor:pointer; font-size:12px; color:var(--brand-mid); font-weight:700; }
+  .kt-title{ display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin-top:6px; }
+  .kt-title h3{ margin:0; font-size:19px; } .kt-meta{ font-size:12px; color:var(--ink-soft); margin-top:4px; display:flex; flex-wrap:wrap; gap:4px 12px; }
+  .kt-btns{ display:flex; gap:6px; flex-shrink:0; } .kt-btn{ font-size:12px; font-weight:700; border:1px solid var(--hair); background:var(--surface-2); color:var(--brand-mid); border-radius:9px; padding:5px 10px; text-decoration:none; cursor:pointer; white-space:nowrap; }
+  .kt-body{ padding:14px 20px 40px; display:grid; gap:12px; }
+  .kt-note{ font-size:12px; background:#FFF6E0; color:#7A5300; border:1px solid #F1D48A; border-radius:10px; padding:8px 12px; }
+  .kt-tiles{ display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
+  .kt-tile{ background:var(--surface); border:1px solid var(--hair); border-radius:12px; padding:10px 12px; } .kt-tile .l{ font-size:11px; color:var(--ink-faint); font-weight:700; } .kt-tile .v{ font-size:17px; font-weight:800; margin-top:2px; } .kt-tile .s{ font-size:11px; color:var(--ink-soft); margin-top:2px; }
+  .kt-card{ background:var(--surface); border:1px solid var(--hair); border-radius:14px; padding:12px 14px; }
+  .kt-card h4{ margin:0 0 8px; font-size:13.5px; display:flex; align-items:center; gap:8px; } .kt-card h4 .src{ margin-left:auto; font-size:11px; color:var(--ink-faint); font-weight:600; }
+  .kt-tbd{ font-size:10.5px; font-weight:700; color:#8A5A00; background:#FFF1CC; border-radius:9999px; padding:1px 8px; }
+  .kt-alert{ display:flex; gap:8px; align-items:flex-start; font-size:12.5px; padding:6px 0; border-bottom:1px solid var(--hair); } .kt-alert:last-child{ border-bottom:0; }
+  .kt-alert i.dot{ width:8px; height:8px; border-radius:50%; margin-top:6px; flex-shrink:0; } .kt-ok{ color:var(--ink-soft); font-size:12.5px; }
+  .kt-kv{ display:grid; grid-template-columns:120px 1fr; gap:5px 10px; font-size:12.5px; } .kt-kv dt{ color:var(--ink-faint); font-weight:700; } .kt-kv dd{ margin:0; }
+  .kt-steps{ display:flex; gap:0; margin:4px 0 2px; } .kt-step{ flex:1; text-align:center; font-size:11px; color:var(--ink-faint); position:relative; padding-top:18px; }
+  .kt-step:before{ content:''; position:absolute; top:5px; left:50%; width:10px; height:10px; margin-left:-5px; border-radius:50%; background:var(--hair); z-index:1; }
+  .kt-step:after{ content:''; position:absolute; top:9px; left:-50%; width:100%; height:2px; background:var(--hair); } .kt-step:first-child:after{ display:none; }
+  .kt-step.on{ color:var(--ink); font-weight:700; } .kt-step.on:before{ background:var(--brand); } .kt-step.on:after{ background:var(--brand); } .kt-step b{ display:block; font-weight:600; color:var(--ink-faint); font-size:10.5px; }
+  .kt-tl{ font-size:12.5px; } .kt-tl .r{ display:grid; grid-template-columns:92px 54px 1fr; gap:8px; padding:6px 0; border-bottom:1px solid var(--hair); } .kt-tl .r:last-child{ border-bottom:0; }
+  .kt-tl .d{ color:var(--ink-soft); font-variant-numeric:tabular-nums; } .kt-tl .k{ font-size:11px; font-weight:700; border-radius:6px; text-align:center; padding:1px 0; height:fit-content; }
+  .kt-tl .who{ color:var(--ink-faint); font-size:11.5px; }
+  .kt-bars{ display:flex; align-items:flex-end; gap:10px; height:110px; padding:6px 4px 0; } .kt-bars .b{ flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; height:100%; font-size:10.5px; color:var(--ink-soft); }
+  .kt-bars .b i{ display:block; width:70%; border-radius:6px 6px 2px 2px; background:var(--brand-mid); opacity:.75; } .kt-bars .b.cur i{ opacity:1; } .kt-bars .b span{ margin-top:4px; white-space:nowrap; }
+  table.kt-t{ width:100%; border-collapse:collapse; font-size:12px; } table.kt-t th, table.kt-t td{ padding:5px 6px; border-bottom:1px solid var(--hair); text-align:left; } table.kt-t th{ color:var(--ink-faint); font-size:11px; } table.kt-t .r{ text-align:right; font-variant-numeric:tabular-nums; }
+  .kt-use{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; } .kt-use div{ border:1px dashed var(--hair); border-radius:10px; padding:8px 10px; font-size:11px; color:var(--ink-faint); } .kt-use b{ display:block; font-size:16px; color:var(--ink-soft); }
+  @media (max-width:640px){ .kt-tiles{ grid-template-columns:repeat(2,1fr); } .kt-use{ grid-template-columns:1fr; } .kt-kv{ grid-template-columns:96px 1fr; } }
+  .kt-na{ border-left:4px solid var(--brand); background:var(--surface-2); border-radius:8px; padding:8px 12px; font-size:12.5px; margin-bottom:8px; } .kt-na.late{ border-left-color:#D93025; } .kt-na .l{ font-size:11px; font-weight:700; color:var(--ink-faint); margin-bottom:2px; } .kt-na .s{ font-size:11px; color:var(--ink-soft); margin-top:2px; }
+  .kt-late{ margin-left:6px; font-size:10.5px; font-weight:700; color:#fff; background:#D93025; border-radius:9999px; padding:1px 7px; }
+  .kt-cmp{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:6px; } .kt-cmp div{ border:1px solid var(--hair); border-radius:10px; padding:6px 10px; font-size:12.5px; } .kt-cmp .l{ display:block; font-size:11px; color:var(--ink-faint); font-weight:700; }
+  .kt-gap{ font-size:12px; color:#8A5A00; background:#FFF6E0; border-radius:8px; padding:6px 10px; margin:6px 0; }
+  .kt-csm{ font-size:10.5px; font-weight:700; color:var(--brand-mid); border:1px solid var(--brand-mid); border-radius:9999px; padding:0 6px; } .kt-new{ font-size:10.5px; font-weight:700; color:#8A5A00; background:#FFF1CC; border-radius:9999px; padding:0 6px; }
+  .kt-meta + .kt-meta{ margin-top:2px; }
+  @media (max-width:640px){ .kt-cmp{ grid-template-columns:1fr; } }
+  .kt-prog{ font-size:11px; font-weight:700; color:var(--brand-mid); background:var(--surface-2); border-radius:9999px; padding:1px 8px; }
+  .kt-bar{ display:flex; gap:3px; margin:2px 0 10px; } .kt-bar i{ flex:1; height:6px; border-radius:3px; background:var(--hair); } .kt-bar i.done{ background:var(--brand); } .kt-bar i.late{ background:#D93025; }
+  .kt-vs{ display:grid; } .kt-v{ display:grid; grid-template-columns:26px 1fr 170px; grid-template-rows:auto auto; column-gap:8px; padding:6px 0; border-bottom:1px solid var(--hair); font-size:12.5px; align-items:center; } .kt-v:last-child{ border-bottom:0; }
+  .kt-v .n{ grid-row:1 / span 2; width:22px; height:22px; border-radius:50%; display:grid; place-items:center; font-size:11px; font-weight:700; background:var(--surface-2); color:var(--ink-faint); border:1px solid var(--hair); }
+  .kt-v .t{ font-weight:600; } .kt-v .d{ text-align:right; color:var(--ink-soft); font-variant-numeric:tabular-nums; font-size:12px; } .kt-v .s{ grid-column:2 / span 2; font-size:10.5px; color:var(--ink-faint); }
+  .kt-v.done .n{ background:var(--brand); color:#fff; border-color:var(--brand); } .kt-v.todo .t{ color:var(--ink-soft); font-weight:500; }
+  .kt-v.late .n{ background:#FCEAEA; color:#D93025; border-color:#D93025; } .kt-v.late .d b{ color:#D93025; font-size:11px; }
+  .kt-v.cur{ background:var(--surface-2); border-radius:8px; padding-left:4px; padding-right:4px; }
+  .kt-now{ margin-left:6px; font-size:10.5px; font-weight:700; color:#fff; background:var(--brand); border-radius:9999px; padding:1px 7px; }
+  .kt-media{ align-items:center; margin-top:4px !important; } .kt-media .l{ font-size:11px; font-weight:700; color:var(--ink-faint); } .kt-mchip{ font-size:11.5px; font-weight:700; color:var(--ink); background:var(--surface-2); border:1px solid var(--hair); border-radius:9999px; padding:1px 9px; }
+  @media (max-width:640px){ .kt-v{ grid-template-columns:26px 1fr; } .kt-v .d{ grid-column:2; text-align:left; } }
+  .kt-scroll{ max-height:420px; overflow:auto; padding-right:4px; }
+  .kt-sep{ position:sticky; top:0; z-index:1; background:var(--surface); font-size:11px; font-weight:800; color:var(--c); padding:8px 0 4px; border-bottom:2px solid var(--c); }
+  .kt-phs{ display:flex; flex-wrap:wrap; gap:6px 12px; font-size:11.5px; color:var(--ink-soft); margin:6px 0 4px; } .kt-phs i{ display:inline-block; width:8px; height:8px; border-radius:2px; background:var(--c); margin-right:4px; } .kt-first{ margin-left:auto; font-weight:700; }
+  .kt-qa{ grid-column:2 / span 2; margin-top:4px; font-size:12px; } .kt-qa summary{ cursor:pointer; color:var(--brand-mid); font-weight:700; font-size:11.5px; }
+  .kt-qa dl{ display:grid; grid-template-columns:140px 1fr; gap:4px 10px; margin:6px 0 2px; padding:8px 10px; background:var(--surface-2); border-radius:8px; } .kt-qa dt{ color:var(--ink-faint); font-weight:700; } .kt-qa dd{ margin:0; }
+  .kt-noqa{ grid-column:2 / span 2; font-size:11px; color:var(--ink-faint); }
+  a.kt-mchip{ text-decoration:none; color:var(--brand-mid); } a.kt-mchip:hover{ border-color:var(--brand-mid); }
+  @media (max-width:640px){ .kt-qa dl{ grid-template-columns:1fr; } }
+  
+  .kt-load{ padding:40px 20px; text-align:center; color:var(--ink-soft); font-size:13px; } .kt-load i{ font-size:22px; display:block; margin-bottom:8px; }
+  .kt-v.na .n{ background:var(--surface-2); color:var(--ink-faint); border-style:dashed; } .kt-v.na .t{ color:var(--ink-faint); font-weight:500; }
+  .kt-qa .ck-ng{ color:#D93025; font-weight:700; }
+  </style>`);
+  const e = (s) => (typeof esc === 'function' ? esc(s) : String(s == null ? '' : s));
+  const yen = (v) => v == null || v === '' ? '—' : Math.round(Number(String(v).replace(/,/g, ''))).toLocaleString('ja-JP');
+  const TODAY = new Date(); TODAY.setHours(0, 0, 0, 0);
+  const dd = (s) => s ? new Date(String(s).replace(/\//g, '-').slice(0, 10) + 'T00:00:00') : null;
+  const ymd = (d) => d ? `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}` : '';
+  const jst = (iso) => { if (!iso) return ''; const d = new Date(iso); return isNaN(d) ? String(iso).slice(0, 10).replace(/-/g, '/') : ymd(d); };
+  const off = (d, n, unit) => { if (!d) return null; const x = new Date(d); if (unit === 'm') x.setMonth(x.getMonth() + n); else x.setDate(x.getDate() + n); return x; };
+  const MEDIA_URL = { 'マイナビ': 'https://job.mynavi.jp/', 'リクナビ': 'https://job.rikunabi.com/', 'キャリタス就活': 'https://job.career-tasu.jp/', 'OfferBox': 'https://offerbox.jp/', 'doda': 'https://doda.jp/', 'ビズリーチ': 'https://www.bizreach.jp/', 'Indeed': 'https://jp.indeed.com/', 'エン転職': 'https://employment.en-japan.com/', 'Wantedly': 'https://www.wantedly.com/', 'キミスカ': 'https://kimisuka.com/', 'ワンキャリア': 'https://www.onecareer.jp/', 'doda新卒エージェント': 'https://doda-student.jp/' };
+  const OUT = { COMPLETED: '完了', SCHEDULED: '予定', CANCELED: 'キャンセル', RESCHEDULED: '日程変更', NO_SHOW: 'ノーショー' };
+
+  function close(){ document.querySelectorAll('.kt-drawer').forEach((d) => d.remove()); }
+  function shell(name, inner){
+    close();
+    document.body.insertAdjacentHTML('beforeend', `<div class="kt-drawer" data-kt-bg><div class="kt-box" id="ktBox">${inner || `<div class="kt-head"><a class="kt-back" data-kt-x>← 一覧に戻る</a><div class="kt-title"><div><h3>${e(name)}</h3></div></div></div><div class="kt-load"><i class="ti ti-loader-2 spin"></i>HubSpot・CS管理・アンケートから読み込んでいます…（初回は10秒ほどかかります）</div>`}</div></div>`);
+    requestAnimationFrame(() => { const d = document.querySelector('.kt-drawer'); if (d) d.classList.add('in'); });
+  }
+
+  async function open(id, name, row){
+    shell(name);
+    if (typeof CS_GAS_URL === 'undefined') { document.getElementById('ktBox').insertAdjacentHTML('beforeend', '<div class="kt-load">デザイン用のページではカルテを読み込めません（本番の index.html で動きます）</div>'); return; }
+    try {
+      const res = await fetch(CS_GAS_URL + '?karte=' + encodeURIComponent(id) + '&token=' + encodeURIComponent(CS_GAS_TOKEN) + '&_=' + Date.now(), { redirect: 'follow' });
+      const j = await res.json();
+      if (!j.ok) throw new Error(j.error || '読み込みに失敗しました');
+      if (!document.querySelector('.kt-drawer')) return;   // 待っている間に閉じた
+      document.getElementById('ktBox').innerHTML = render(j.data, row || {});
+    } catch (err) {
+      const b = document.getElementById('ktBox'); if (b) b.insertAdjacentHTML('beforeend', `<div class="kt-load" style="color:#D93025">カルテを読み込めませんでした：${e(err.message)}</div>`);
+    }
+  }
+
+  function render(K, row){
+    const cs = K.cs || {}, sv = K.surveys || {}, q = K.quote || {};
+    const start = dd(cs.start), end = dd(cs.end), left = end ? Math.round((end - TODAY) / 86400000) : null;
+    const tl = (K.timeline || []).map((r) => Object.assign({}, r, { day: jst(r.d) }));
+    const hsLast = tl.find((r) => r.d && new Date(r.d) <= new Date() && (r.k !== 'MTG' || r.res !== 'CANCELED'));
+    const nextMtg = tl.filter((r) => r.k === 'MTG' && r.res === 'SCHEDULED' && new Date(r.d) > new Date()).pop();
+    const daysSince = hsLast ? Math.round((TODAY - dd(hsLast.day)) / 86400000) : null;
+    const csTouch = cs.touch ? dd(cs.touch) : null;
+    const lag = csTouch && hsLast ? Math.round((dd(hsLast.day) - csTouch) / 86400000) : 0;
+    const naD = cs.naDate ? dd(cs.naDate) : null, naLate = naD && naD < TODAY && cs.st === '未決着';
+    const look = cs.look || row.dlook || '';
+    // ---- 契約開始からのステージ（11段階）
+    const KO_D = K.kickoff ? new Date(K.kickoff) : null;
+    const first = start && (TODAY - start) < 400 * 86400000;   // 今の契約が始まって1年ちょっと以内なら、キックオフまわりの遅れも見る
+    const S = (l, d, src, done, due, qa, opt) => {
+      let st = done ? 'done' : (due && due < TODAY && !(opt && opt.noLate)) ? 'late' : 'todo';
+      if (opt && opt.na) st = 'na';
+      return { l, d: done ? (d || '') : (due ? ymd(due) : ''), src, st, qa, note: opt && opt.note };
+    };
+    const svDate = (k) => sv[k] ? dd(sv[k].d) : null;
+    const qa3 = sv.q3 && end && Math.abs(dd(sv.q3.d) - end) < 200 * 86400000 ? sv.q3 : null;   // 今の契約の満了に向けた回答だけ
+    const qaPre = sv.pre && end && Math.abs(dd(sv.pre.d) - end) < 200 * 86400000 ? sv.pre : null;
+    const fin = cs.st === '更新' || cs.st === '解約';
+    const STEPS = [
+      S('契約開始日', ymd(start), 'CS管理 E列', !!start, null),
+      S('キックオフ前アンケート', sv.ko ? ymd(svDate('ko')) : '', sv.ko ? sv.ko.label : 'キックオフ前アンケート', !!sv.ko, first ? off(start, 7) : null, sv.ko, { noLate: !first }),
+      S('キックオフ開始日', KO_D ? ymd(KO_D) : '', 'HubSpot（件名に「キックオフ」のMTG）', !!KO_D, first ? off(start, 14) : null, null, { noLate: !first }),
+      S('キックオフ完了日', sv.done ? ymd(svDate('done')) : '', '初期設定完了チェックリスト（回答日）', !!sv.done, first ? off(start, 60) : null, sv.done, { noLate: !first }),
+      S('更新6か月前アンケート', '', 'データ元なし（回答シートが見つかっていません）', false, null, null, { na: true }),
+      S('更新3か月前アンケート', qa3 ? ymd(dd(qa3.d)) : '', '契約更新意向登録フォーム', !!qa3, off(end, -3, 'm'), qa3),
+      S('更新前アンケート', qaPre ? ymd(dd(qaPre.d)) : '', 'rpt時満足度アンケート', !!qaPre, off(end, -1, 'm'), qaPre),
+      S('見積承認済', q.appr ? q.appr.replace(/-/g, '/') : '', 'CS管理 AA列' + (q.src && q.src.appr ? '（日付：' + q.src.appr + '）' : ''), cs.appr === '1' || fin, off(end, -45)),
+      S(cs.sent === '99' ? '見積送付不要' : '見積送付済', q.sent ? q.sent.replace(/-/g, '/') : '', 'CS管理 AB列' + (q.src && q.src.sent ? '（日付：' + q.src.sent + '）' : ''), ['1', '99'].includes(cs.sent) || fin, off(end, -40)),
+      S(cs.sign === '2' ? '解約フォーム送付済' : 'クラウドサイン送付済', q.sign ? q.sign.replace(/-/g, '/') : '', 'CS管理 AC列', ['1', '2'].includes(cs.sign) || fin, off(end, -20)),
+      S(cs.st === '解約' ? '解約' : '更新', fin ? ymd(end) : '', 'CS管理 M列「決着」', fin, null),
+    ];
+    const nDone = STEPS.filter((s) => s.st === 'done').length, late = STEPS.filter((s) => s.st === 'late');
+    const cur = STEPS.find((s) => s.st !== 'done' && s.st !== 'na');
+    // ---- 要注意のサイン
+    const al = [];
+    if (look === '危険') al.push(['#D93025', '更新見込が「危険」', 'CS管理 O列（最新）']);
+    if (cs.st === '未決着' && left != null && left <= 60 && !['1', '99'].includes(cs.sent)) al.push(['#D93025', `満了まで${left}日・見積をまだ送っていない`, 'CS管理 AB列が空欄']);
+    if (daysSince != null && daysSince >= 14 && cs.st !== '解約') al.push(['#E8A400', `最後の接点から${daysSince}日たっている`, 'HubSpotのミーティング・通話・メール']);
+    if (naLate) al.push(['#E8A400', `ネクストアクションの期日を過ぎている（${ymd(naD).slice(5)}）`, 'CS管理 P列（NA日）']);
+    if (lag >= 3) al.push(['#E8A400', `CS管理の接触日が${lag}日古い`, `CS管理 X列 ${ymd(csTouch)}／HubSpotの最新の接点 ${hsLast.day}`]);
+    if (late.length) al.push(['#D93025', `ステージの遅れ ${late.length}件（${late.map((s) => s.l).join('・')}）`, '予定日を過ぎても済んでいない']);
+    if (sv.done && sv.done.qa.some(([qq, a]) => /^チェック/.test(qq) && /出来ていない|いいえ|確認|相談/.test(a))) al.push(['#E8A400', '完了チェックリストに「できていない／相談したい」の回答あり', 'キックオフ完了アンケート']);
+    // ---- 接点の履歴：契約開始より前＝商談（FS）、キックオフ完了（なければ開始＋60日）まで＝オンボーディング、その後＝運用
+    const firstStart = (sv.ko && svDate('ko')) || start;
+    const onbEnd = (sv.done && svDate('done')) || off(KO_D || start, 60);
+    const ph = (r) => { const d = dd(r.day); if (KO_D && d < KO_D && firstStart && d < firstStart) return 'sales'; if (onbEnd && d <= onbEnd && KO_D && d >= off(KO_D, -30)) return 'onb'; return 'ops'; };
+    const PH = { ops: ['運用（CS）', '#2575F0'], onb: ['オンボーディング', '#1E8E4E'], sales: ['商談（FS）', '#8A5A00'] };
+    const kinds = { 'MTG': ['#E6F0FE', '#2575F0'], '通話': ['#E8F6EE', '#1E8E4E'], 'メール': ['#F1F1F4', '#5A6577'] };
+    let ph0 = '', marked = false;
+    const tlHtml = tl.map((r) => {
+      const p = ph(r), k = kinds[r.k];
+      let mark = '';
+      if (csTouch && !marked && dd(r.day) <= csTouch) { marked = true; if (+dd(r.day) === +csTouch) mark = '<span class="kt-csm">CS管理の接触日</span>'; }
+      else if (csTouch && lag >= 3 && dd(r.day) > csTouch && new Date(r.d) <= new Date()) mark = '<span class="kt-new">CS管理に未反映</span>';
+      const sub = r.k === 'メール' ? r.dir : r.k === 'MTG' ? (OUT[r.res] || '') : (r.dur ? `${Math.round(r.dur / 60)}分` : '');
+      const sep = p !== ph0 ? `<div class="kt-sep" style="--c:${PH[p][1]}">${PH[p][0]}</div>` : ''; ph0 = p;
+      return sep + `<div class="r"><span class="d">${e(r.day)}</span><span class="k" style="background:${k[0]};color:${k[1]}">${r.k}</span><span>${e(r.t)} <span class="who">${e([sub, r.who].filter(String).join('・'))}</span> ${mark}</span></div>`;
+    }).join('') || '<div class="kt-ok">HubSpotに接点の記録がありません</div>';
+    const cnt = (p) => tl.filter((r) => ph(r) === p).length;
+    const qaHtml = (x) => x ? `<details class="kt-qa"><summary>回答を見る（${e(x.d.slice(0, 10))}${x.n > 1 ? `・回答${x.n}件のうち最新` : ''}）</summary><dl>${x.qa.map(([qq, a]) => `<dt>${e(qq)}</dt><dd class="${/出来ていない|いいえ/.test(a) ? 'ck-ng' : ''}">${e(a)}</dd>`).join('')}</dl></details>` : '';
+    const web = K.web ? (/^https?:/.test(K.web) ? K.web : 'https://' + K.web) : '';
+    const media = (K.media || []).map((m) => `<a class="kt-mchip" href="${e(m === 'マイナビ' && K.mynavi ? K.mynavi : (MEDIA_URL[m] || 'https://www.google.com/search?q=' + encodeURIComponent(m)))}" target="_blank" rel="noopener noreferrer">${e(m)} ↗</a>`).join('');
+    return `<div class="kt-head"><a class="kt-back" data-kt-x>← 一覧に戻る</a>
+        <div class="kt-title"><div><h3>${e(K.name)}</h3>
+          <div class="kt-meta"><span>担当 ${e(cs.member || row.member || K.owner || '—')}</span>${row.team ? `<span>${e(row.juris || '')}・${e(row.team)}</span>` : ''}${row.acct ? `<span>${e(row.acct)}</span>` : ''}<span>契約終了 ${e(cs.end ? cs.end.replace(/-/g, '/') : (row.end || '—'))}${left != null && left >= 0 ? `（あと${left}日）` : ''}</span>${look ? `<span>${typeof rcLook === 'function' ? rcLook({ dlook: look }) : e(look)}</span>` : ''}</div>
+          <div class="kt-meta"><span>業界 <b>${e(K.ind || '—')}</b></span><span>従業員数 <b>${K.emp ? Number(K.emp).toLocaleString('ja-JP') + '人' : '—'}</b></span><span>エリア <b>${e(K.area || '—')}</b></span><span>HP ${web ? `<a href="${e(web)}" target="_blank" rel="noopener noreferrer">${e(K.web)}</a>` : '—'}</span></div>
+          <div class="kt-meta kt-media"><span class="l">利用媒体</span>${media || '<span style="color:var(--ink-faint)">（HubSpotに未入力）</span>'}</div></div>
+          <div class="kt-btns"><a class="kt-btn" href="${e(K.url)}" target="_blank" rel="noopener noreferrer">HubSpotで開く ↗</a>${cs.row ? `<a class="kt-btn" href="https://docs.google.com/spreadsheets/d/1VZHTlcRTAlseP-8SqoRadeVibV7cZYVC-m-M5tKPDDc/edit#gid=282292224&range=A${cs.row}" target="_blank" rel="noopener noreferrer">CS管理の行 ↗</a>` : ''}</div></div>
+      </div>
+      <div class="kt-body">
+        ${cs.row ? '' : '<div class="kt-note">CS管理シートでこの会社の行が見つかりませんでした（HubSpot会社ID・かんりくんIDで照合）。CS管理の項目は空欄で表示しています。</div>'}
+        <div class="kt-card"><h4>⚠ 要注意のサイン</h4>
+          ${al.map(([c, t, s]) => `<div class="kt-alert"><i class="dot" style="background:${c}"></i><div><b>${e(t)}</b><div style="font-size:11px;color:var(--ink-faint)">${e(s)}</div></div></div>`).join('') || '<div class="kt-ok">今のところ気になる点はありません</div>'}
+        </div>
+        <div class="kt-card"><h4>契約開始からのステージ <span class="kt-prog">${nDone}/${STEPS.length} 完了</span>${late.length ? `<span class="kt-late">遅れ ${late.length}</span>` : ''}<span class="src">今：${cur ? e(cur.l) : '完了'}</span></h4>
+          <div class="kt-bar">${STEPS.map((s) => `<i class="${s.st}" title="${e(s.l)}"></i>`).join('')}</div>
+          <div class="kt-vs">${STEPS.map((s, j) => `<div class="kt-v ${s.st}${s === cur ? ' cur' : ''}"><span class="n">${s.st === 'done' ? '✓' : j + 1}</span><span class="t">${e(s.l)}${s === cur ? '<span class="kt-now">今ここ</span>' : ''}</span><span class="d">${e(s.d)}${s.st === 'done' ? '' : s.st === 'late' ? ' <b>予定日を過ぎています</b>' : s.st === 'na' ? '' : s.d ? ' 予定' : ''}</span><span class="s">${e(s.src)}</span>${qaHtml(s.qa)}</div>`).join('')}</div>
+          <div style="font-size:11px;color:var(--ink-faint);margin-top:6px">見積の日付は「見積ステージの記録」（毎日CS管理を読んで1が入った日を残す）か、HubSpotの見積メールからの推定です。日付が無い段階は「済／未」だけ出しています</div>
+        </div>
+        <div class="kt-card"><h4>ネクストアクションと接点の履歴 <span class="src">CS管理 × HubSpot（初回商談から）</span></h4>
+          <div class="kt-na ${naLate ? 'late' : ''}"><div class="l">ネクストアクション（CS管理 Z列）${naLate ? '<span class="kt-late">期日切れ</span>' : ''}</div><div style="white-space:pre-wrap">${e(cs.na || '（空欄）')}</div>${cs.naDate || cs.naNote ? `<div class="s">NA日 ${e(cs.naDate ? cs.naDate.replace(/-/g, '/') : '—')}　${e(cs.naNote || '')}</div>` : ''}</div>
+          <div class="kt-cmp">
+            <div><span class="l">CS管理の接触日（X列）</span><b>${csTouch ? ymd(csTouch) : '—'}</b></div>
+            <div><span class="l">HubSpotの最新の接点</span><b>${hsLast ? e(hsLast.day) : '—'}</b></div>
+            <div><span class="l">次の予定（HubSpot）</span><b>${nextMtg ? e(jst(nextMtg.d) + ' ' + nextMtg.t) : '<span style="color:#D93025">予定なし</span>'}</b></div>
+          </div>
+          ${lag >= 3 ? `<div class="kt-gap">CS管理の接触日より後に、HubSpotで接点があります。CS管理の更新がまだかもしれません</div>` : ''}
+          <div class="kt-phs">${Object.keys(PH).map((p) => `<span style="--c:${PH[p][1]}"><i></i>${PH[p][0]} ${cnt(p)}件</span>`).join('')}</div>
+          <div class="kt-tl kt-scroll">${tlHtml}</div>
+        </div>
+        <div class="kt-card"><h4>先方のご担当者（${(K.contacts || []).length}人） <span class="src">HubSpot 会社に紐づくコンタクトすべて</span></h4>
+          <div class="tbl-wrap"><table class="kt-t"><thead><tr><th>お名前</th><th>役職</th><th>メール</th><th>電話</th><th>最後の接点</th></tr></thead><tbody>
+            ${(K.contacts || []).map((c) => `<tr><td><a href="https://app.hubspot.com/contacts/23871469/record/0-1/${e(c.id)}" target="_blank" rel="noopener noreferrer">${e(c.nm)}</a></td><td>${e(c.ttl) || '—'}</td><td>${e(c.mail) || '—'}</td><td>${e(c.tel) || '—'}</td><td>${c.last ? jst(c.last) : '<span style="color:var(--ink-faint)">なし</span>'}</td></tr>`).join('') || '<tr><td colspan="5" style="color:var(--ink-faint)">コンタクトが紐づいていません</td></tr>'}
+          </tbody></table></div>
+        </div>
+        <div style="font-size:11px;color:var(--ink-faint);text-align:right">取得 ${e(jst(K.at))}（1時間ごとに取り直します）</div>
+      </div>`;
+  }
+
+  // ドロワー・一覧の中の会社名（HubSpotの会社ページへのリンク）をクリック → カルテを開く。カルテの中の「HubSpotで開く」はそのまま飛ぶ
+  document.addEventListener('click', (ev) => {
+    if (ev.target.closest('[data-kt-x]') || (ev.target.hasAttribute && ev.target.hasAttribute('data-kt-bg'))) { ev.preventDefault(); ev.stopPropagation(); close(); return; }
+    const a = ev.target.closest('a[href*="hubspot.com"]');
+    if (!a || a.closest('.kt-drawer') || !a.closest('.rc-drawer,.rc-modal,.rc-pop,.rc-acc')) return;
+    const m = (a.getAttribute('href') || '').match(/record\/0-2\/(\d+)/); if (!m) return;
+    ev.preventDefault(); ev.stopPropagation();
+    const href = a.getAttribute('href');
+    const row = ((typeof D !== 'undefined' && D && D.rlist) || []).filter((x) => x.url === href).sort((x, y) => (x.em < y.em ? 1 : -1))[0];
+    open(m[1], a.textContent.trim(), row);
+  }, true);
+  document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape' && document.querySelector('.kt-drawer')) { ev.stopImmediatePropagation(); close(); } }, true);
+})();
+
+</script>
 </body>
 </html>
