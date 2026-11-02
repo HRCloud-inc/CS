@@ -1585,7 +1585,8 @@ syncScope(); render(); spy();
     const look = cs.look || row.dlook || '';
     // ---- 契約開始からのステージ（11段階）
     const KO_D = K.kickoff ? new Date(K.kickoff) : null;
-    const first = start && (TODAY - start) < 400 * 86400000;   // 今の契約が始まって1年ちょっと以内なら、キックオフまわりの遅れも見る
+    // キックオフまわりの遅れは、今の契約が「新規」（1年目）のときだけ見る（継続の会社は初回契約時のこと）
+    const first = K.first === true || (K.first == null && start && (TODAY - start) < 400 * 86400000);
     const S = (l, d, src, done, due, qa, opt) => {
       let st = done ? 'done' : (due && due < TODAY && !(opt && opt.noLate)) ? 'late' : 'todo';
       if (opt && opt.na) st = 'na';
@@ -1595,6 +1596,8 @@ syncScope(); render(); spy();
     const qa3 = sv.q3 && end && Math.abs(dd(sv.q3.d) - end) < 200 * 86400000 ? sv.q3 : null;   // 今の契約の満了に向けた回答だけ
     const qaPre = sv.pre && end && Math.abs(dd(sv.pre.d) - end) < 200 * 86400000 ? sv.pre : null;
     const fin = cs.st === '更新' || cs.st === '解約';
+    // 見積は後の段階が済んでいれば前の段階も済み（例：送付済なら承認も済み）
+    const qSign = ['1', '2'].includes(cs.sign) || fin, qSent = ['1', '99'].includes(cs.sent) || qSign, qAppr = cs.appr === '1' || qSent;
     const STEPS = [
       S('契約開始日', ymd(start), 'CS管理 E列', !!start, null),
       S('キックオフ前アンケート', sv.ko ? ymd(svDate('ko')) : '', sv.ko ? sv.ko.label : 'キックオフ前アンケート', !!sv.ko, first ? off(start, 7) : null, sv.ko, { noLate: !first }),
@@ -1603,9 +1606,9 @@ syncScope(); render(); spy();
       S('更新6か月前アンケート', '', 'データ元なし（回答シートが見つかっていません）', false, null, null, { na: true }),
       S('更新3か月前アンケート', qa3 ? ymd(dd(qa3.d)) : '', '契約更新意向登録フォーム', !!qa3, off(end, -3, 'm'), qa3),
       S('更新前アンケート', qaPre ? ymd(dd(qaPre.d)) : '', 'rpt時満足度アンケート', !!qaPre, off(end, -1, 'm'), qaPre),
-      S('見積承認済', q.appr ? q.appr.replace(/-/g, '/') : '', 'CS管理 AA列' + (q.src && q.src.appr ? '（日付：' + q.src.appr + '）' : ''), cs.appr === '1' || fin, off(end, -45)),
-      S(cs.sent === '99' ? '見積送付不要' : '見積送付済', q.sent ? q.sent.replace(/-/g, '/') : '', 'CS管理 AB列' + (q.src && q.src.sent ? '（日付：' + q.src.sent + '）' : ''), ['1', '99'].includes(cs.sent) || fin, off(end, -40)),
-      S(cs.sign === '2' ? '解約フォーム送付済' : 'クラウドサイン送付済', q.sign ? q.sign.replace(/-/g, '/') : '', 'CS管理 AC列', ['1', '2'].includes(cs.sign) || fin, off(end, -20)),
+      S('見積承認済', q.appr ? q.appr.replace(/-/g, '/') : '', 'CS管理 AA列' + (q.src && q.src.appr ? '（日付：' + q.src.appr + '）' : ''), qAppr, off(end, -45)),
+      S(cs.sent === '99' ? '見積送付不要' : '見積送付済', q.sent ? q.sent.replace(/-/g, '/') : '', 'CS管理 AB列' + (q.src && q.src.sent ? '（日付：' + q.src.sent + '）' : ''), qSent, off(end, -40)),
+      S(cs.sign === '2' ? '解約フォーム送付済' : 'クラウドサイン送付済', q.sign ? q.sign.replace(/-/g, '/') : '', 'CS管理 AC列', qSign, off(end, -20)),
       S(cs.st === '解約' ? '解約' : '更新', fin ? ymd(end) : '', 'CS管理 M列「決着」', fin, null),
     ];
     const nDone = STEPS.filter((s) => s.st === 'done').length, late = STEPS.filter((s) => s.st === 'late');
@@ -1620,7 +1623,7 @@ syncScope(); render(); spy();
     if (late.length) al.push(['#D93025', `ステージの遅れ ${late.length}件（${late.map((s) => s.l).join('・')}）`, '予定日を過ぎても済んでいない']);
     if (sv.done && sv.done.qa.some(([qq, a]) => /^チェック/.test(qq) && /出来ていない|いいえ|確認|相談/.test(a))) al.push(['#E8A400', '完了チェックリストに「できていない／相談したい」の回答あり', 'キックオフ完了アンケート']);
     // ---- 接点の履歴：契約開始より前＝商談（FS）、キックオフ完了（なければ開始＋60日）まで＝オンボーディング、その後＝運用
-    const firstStart = (sv.ko && svDate('ko')) || start;
+    const firstStart = (K.firstStart && dd(K.firstStart)) || (sv.ko && svDate('ko')) || start;
     const onbEnd = (sv.done && svDate('done')) || off(KO_D || start, 60);
     const ph = (r) => { const d = dd(r.day); if (KO_D && d < KO_D && firstStart && d < firstStart) return 'sales'; if (onbEnd && d <= onbEnd && KO_D && d >= off(KO_D, -30)) return 'onb'; return 'ops'; };
     const PH = { ops: ['運用（CS）', '#2575F0'], onb: ['オンボーディング', '#1E8E4E'], sales: ['商談（FS）', '#8A5A00'] };
