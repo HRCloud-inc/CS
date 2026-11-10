@@ -209,10 +209,15 @@
 
   .ap-k .k{ font-size:11.5px; font-weight:700; color:var(--ink-faint); } .ap-k .v{ font-size:22px; font-weight:800; margin:4px 0 2px; } .ap-k .s{ font-size:11.5px; color:var(--ink-soft); }
   table.ap-t td, table.ap-t th{ padding:6px 10px; } table.ap-t tr.fut td{ color:var(--ink-faint); } table.ap-t tr.fut td b{ font-weight:600; }
-  .nrr-row{ display:grid; grid-template-columns:minmax(260px,0.9fr) 1.25fr 1.25fr; gap:12px; align-items:stretch; }
-  @media (max-width:1100px){ .nrr-row{ grid-template-columns:1fr 1fr; } .nrr-row > #apK{ grid-column:1/-1; } }
-  @media (max-width:720px){ .nrr-row{ grid-template-columns:1fr; } }
-  .nrr-row #apK .nb-grid{ grid-template-columns:1fr; gap:10px; height:100%; }
+  .nrr-row{ display:grid; grid-template-columns:minmax(0,2fr) minmax(0,1.3fr); gap:12px; align-items:stretch; }   /* 2026-11-10：確定｜見通し｜NRRブリッジ */
+  @media (max-width:1100px){ .nrr-row{ grid-template-columns:1fr; } }
+  .nrr-row #apK .nb-grid{ grid-template-columns:1fr 1fr; gap:12px; height:100%; } @media (max-width:720px){ .nrr-row #apK .nb-grid{ grid-template-columns:1fr; } }
+  /* 確定・見通しのカード（表） */
+  .nb-tbl{ width:100%; border-collapse:collapse; font-size:12.5px; } .nb-tbl th{ position:static; background:none; font-size:11px; padding:6px 6px; } .nb-tbl td{ padding:7px 6px; cursor:default; }
+  .nb-tbl tbody tr{ cursor:default; } .nb-tbl tbody tr:hover{ background:none; } .nb-tbl tr.sum td{ font-weight:700; border-top:1px solid var(--ink-faint); } .nb-tbl tr.sub td:first-child{ padding-left:18px; color:var(--ink-soft); }
+  .nb-tbl .up{ color:var(--success); } .nb-tbl .dn{ color:var(--danger); } .nb-tbl .muted{ color:var(--ink-faint); }
+  .nb-kpi{ background:var(--surface-2); border-radius:10px; } .nb-kpi th{ font-size:10.5px; }
+  .nb-t .nrrv{ font-size:12px; font-weight:800; margin-left:2px; } .nb-t .nrrv.ok{ color:var(--success); } .nb-t .nrrv.ng{ color:var(--danger); }
   .nrr-row .nb-card{ padding:11px 14px; gap:4px; } .nrr-row .nb-v b{ font-size:28px; } .nrr-row .nb-bar{ margin:12px 0 2px; height:10px; }
   .nrr-row .nb-s, .nrr-row .nb-m{ font-size:11.5px; } .nrr-row .nb-m{ padding-top:5px; }
   .nrr-ch{ padding:12px 14px; display:flex; flex-direction:column; } .nrr-ch h3{ margin:0 0 4px; font-size:13px; display:flex; align-items:center; gap:4px; } .nrr-ch .clk{ margin-left:auto; }
@@ -442,8 +447,7 @@
   <div class="ap-note" id="apNote"></div>
   <div class="nrr-row">
     <div class="ds-rise" id="apK"></div>
-    <div class="card ds-rise nrr-ch"><h3><span id="wfTitle">NRRブリッジ</span><span class="help qtip" data-tip="NRRブリッジ||更新対象ARR（母数）→ 解約 → ダウンセル → アップセル → 未決着 → 残ったARR（確定）→ 着地予測（見通し）||赤い点線＝目標（母数×94.49%）。残ったARR（確定）と着地予測（見通し）がこの線を越えれば達成||棒をクリックするとその中身の企業一覧（サイドドロワー）">?</span><span class="clk"><i class="ti ti-pointer"></i> 棒で企業一覧</span></h3><div class="chart"><canvas id="cNB"></canvas></div></div>
-    <div class="card ds-rise nrr-ch"><h3>NRRの推移（累計）<span class="help qtip" data-tip="NRRの推移（累計）||青の点線と帯＝目標（満了額×94.49%の累計）／太線＝実績（確定して残ったARR）／オレンジの点線＝予測（契約ベース）／赤の点線＝目標に必要なペース||横軸は選んだ単位（年間は月次）||点をクリックするとその期間の集計表（サイドドロワー）">?</span><span class="clk"><i class="ti ti-pointer"></i> 点で集計表</span></h3><div class="chart"><canvas id="cAP"></canvas></div></div>
+    <div class="card ds-rise nrr-ch"><h3><span id="wfTitle">NRRブリッジ</span><span class="help qtip" data-tip="NRRブリッジ||更新対象ARR（母数）→ 解約 → ダウンセル → アップセル → 未決着 → 残ったARR（確定）→ 着地予測（見通し）||赤い点線＝目標（母数×94.36%）。残ったARR（確定）と着地予測（見通し）がこの線を越えれば達成||棒をクリックするとその中身の企業一覧（サイドドロワー）">?</span><span class="clk"><i class="ti ti-pointer"></i> 棒で企業一覧</span></h3><div class="chart"><canvas id="cNB"></canvas></div></div>
   </div>
   <div hidden>
   <div class="sec-t" id="hTgt"></div><div id="tgt"></div><div class="sec-t" id="hArr"></div><div id="kArr"></div>
@@ -633,11 +637,11 @@ function calcRen(key, ms){
 }
 
 // ---------- NRR（売上継続率）：今期に満了する契約（期首からの顧客）の期首時点のARRを母数に、どれだけ残るか ----------
-//   新規受注・会社全体の目標は含めない。目標：NRC 5.51%以下 ＝ 母数 × 94.49% を維持
+//   新規受注・会社全体の目標は含めない。目標：NRC 5.64%以下 ＝ 母数 × 94.36% を維持
 //   母数＝更新前ARR － 4月以降の途中追加 ＋ 4月以降の途中終了（期首時点に戻す：途中追加を二重に数えないため）
 //   アップセル＝更新時の増額 ＋ 契約途中のオプション追加（計上月）。ダウンセル＝更新時の減額 ＋ 途中終了。途中の増減は今期に満了する契約のものだけ
-//   予測＝確定分 ＋ 未決着 × 更新確率（更新予定80%・危険20%・不明/空欄50%）。クロスセル（単発）は計算ルールどおりNRRに入れず別に表示
-const NRC_TARGET = 0.0551, NRR_TARGET = 1 - NRC_TARGET;
+//   予測＝確定分 ＋ 未決着 × 更新確率（更新予定90%・危険20%・不明/空欄70%）。クロスセル（単発）は計算ルールどおりNRRに入れず別に表示
+const NRC_TARGET = 0.0564, NRR_TARGET = 1 - NRC_TARGET;   /* 2026-11-10 深津さん：NRC目標5.64%（NRR 94.36%）に変更（前は5.51%） */
 function nrrStat(key, ms){
   const NG = (D.nagai||{})[key];
   if (NG) {   // 2026-10-30：永井式（CS管理の年額。期中の追加は入れない）
@@ -648,7 +652,8 @@ function nrrStat(key, ms){
     const pendExp = pPlan*RC_P.plan + pDanger*RC_P.danger + pOther*RC_P.other, exp = retained + pendExp, decBase = base - pendA;
     return { ms, base, churn:churnA, pend:pendA, up, down, upRen:up, downRen:down, midUp:0, midDown:0, kept, retained, pendExp, exp,
       pPlan, pDanger, pOther, target: base*NRR_TARGET, nrr: decBase>0 ? retained/decBase : null, nrrFc: base ? exp/base : null,
-      cross: ms.reduce((a,m)=>a+(calc(key,[m]).cross||0),0), done: !pendA, fut: ms[0] > CUR, nagai: true };
+      cross: ms.reduce((a,m)=>a+(calc(key,[m]).cross||0),0), done: !pendA, fut: ms[0] > CUR, nagai: true,
+      cnt: { n:n('n'), ren:n('renN'), churn:n('churnN'), up:n('upN'), down:n('downN'), pend:n('pendN') } };   /* 社数（2026-11-10 確定・見通しの表に使う） */
   }
   const U = (D.renew||{})[key]||{}, g = k => ms.reduce((a,m)=>a+(((U[m]||{})[k])||0),0);
   const X = calcRen(key, ms);
@@ -679,14 +684,14 @@ function drawNrr(key){
   const span = `<span style="font-weight:500;color:var(--ink-faint);letter-spacing:0;margin-left:6px">`;
   const endW = P.ms.length===1?'月末':'期末';
   const R = nrrStat(key, P.ms);
-  document.getElementById('hAP').innerHTML = `${P.short}のNRR（売上継続率）（${esc(who)}）${span}更新対象ARR <b style="color:var(--ink)">${yen(R.base)}</b> ／ 目標 NRR 94.49%以上 ＝ <b style="color:var(--ink)">${yen(R.target)}</b> を維持（新規は含めない）</span>${S.period==='月'?`<span class="mwarn" data-tip="${esc(tip('単月のNRRについて','単月のNRRは、契約途中のオプション追加が起きた月に入るため、ぶれやすい数字です','','判断は四半期・半期・年間で行うことをおすすめします'))}"><i class="ti ti-alert-circle"></i> 単月はぶれやすい</span>`:''}`;
+  document.getElementById('hAP').innerHTML = `${P.short}のNRR（売上継続率）（${esc(who)}）${span}更新対象ARR <b style="color:var(--ink)">${yen(R.base)}</b> ／ 目標 NRR 94.36%以上 ＝ <b style="color:var(--ink)">${yen(R.target)}</b> を維持（新規は含めない）</span>${S.period==='月'?`<span class="mwarn" data-tip="${esc(tip('単月のNRRについて','単月のNRRは、契約途中のオプション追加が起きた月に入るため、ぶれやすい数字です','','判断は四半期・半期・年間で行うことをおすすめします'))}"><i class="ti ti-alert-circle"></i> 単月はぶれやすい</span>`:''}`;
   document.getElementById('apNote').innerHTML = '';
   const needUp = Math.max(0, R.target - R.exp);
   const card = (k,v,s,cls,tp) => `<div class="ap-k ${cls||''}" ${tp?`data-tip="${esc(tp)}"`:''}><div class="k">${k}</div><div class="v num">${v}</div><div class="s">${s||''}</div></div>`;
   const monthWarn = S.period==='月' ? '\n※ 単月はぶれやすい。判断は四半期・半期・年間で' : '';
-  // 目標に対する実績を「確定ベース」と「見通しベース」の2枚で。バーは0〜110%、赤い印が目標94.49%
+  // 目標に対する実績を「確定ベース」と「見通しベース」の2枚で。バーは0〜110%、赤い印が目標94.36%
   const bullet = (v, tl) => { const X = x => Math.max(0, Math.min(100, x/1.1)); const ok = v!=null && v>=NRR_TARGET;
-    return `<div class="nb-bar"><span class="fill ${ok?'ok':'ng'}" style="width:${v==null?0:X(v*100)}%"></span><i class="tg" style="left:${X(94.49)}%"></i><b class="tl" style="left:${X(94.49)}%">目標 ${tl}</b></div>`; };
+    return `<div class="nb-bar"><span class="fill ${ok?'ok':'ng'}" style="width:${v==null?0:X(v*100)}%"></span><i class="tg" style="left:${X(94.36)}%"></i><b class="tl" style="left:${X(94.36)}%">目標 ${tl}</b></div>`; };
   const judge = () => '';
   const gap = v => v==null ? '' : `<span class="${v>=NRR_TARGET?'up':'dn'}">${v>=NRR_TARGET?'+':'−'}${(Math.abs(v-NRR_TARGET)*100).toFixed(1)}pt</span>`;
   const decB = R.base - R.pend;
@@ -696,43 +701,56 @@ function drawNrr(key){
   const gDec = AMT ? (R.nrr==null?'':`<span class="${R.retained>=tDec?'up':'dn'}">${sgn(R.retained-tDec)}</span>`) : gap(R.nrr);
   const gFc  = AMT ? (R.nrrFc==null?'':`<span class="${R.exp>=R.target?'up':'dn'}">${sgn(R.exp-R.target)}</span>`) : gap(R.nrrFc);
   const one = (lab, v, cls) => `<span>${lab} <b class="${cls}">${AMT ? (v<0?'−':'+')+mn(Math.abs(v)) : (v<0?'−':'+')+(R.base?(Math.abs(v)/R.base*100).toFixed(1):'0')+'%'}</b></span>`;
+  /* 2026-11-10 深津さん：確定・見通しのカードを「項目｜社数｜年額｜月額」の表に */
+  const C = R.cnt || {}, cN = v => v==null ? '—' : v+'社';
+  const yy = (v, sign) => { if(v==null) return '—'; const r=Math.round(v); return (sign && r>0 ? '+' : r<0 ? '−' : '') + Math.abs(r).toLocaleString('ja-JP'); };
+  const tr = (lab, cnt, v, o) => { o=o||{}; const c = o.cls||''; return `<tr class="${o.row||''}"><td style="text-align:left">${lab}</td><td class="num">${cnt}</td><td class="num ${c}">${yy(v,o.sign)}</td><td class="num ${c}">${yy(v==null?null:v/12,o.sign)}</td></tr>`; };
+  const head = '<thead><tr><th style="text-align:left">項目</th><th>社数</th><th>年額</th><th>月額</th></tr></thead><tbody>';
+  const delta = R.up - R.down - R.churn;
+  const tblDec = head
+    + tr('更新対象', cN(C.n), R.base)
+    + tr('更新済み', cN(C.ren), R.base - R.churn - R.pend)
+    + tr('解約', cN(C.churn), -R.churn, {cls:'dn'})
+    + (R.pend ? tr('未決着', cN(C.pend), R.pend, {cls:'muted'}) : '')
+    + tr('アップセル', cN(C.up), R.up, {cls:'up', sign:true})
+    + tr('ダウンセル', cN(C.down), -R.down, {cls:'dn'})
+    + tr('増減の合計', '—', delta, {cls: delta>=0?'up':'dn', sign:true, row:'sum'}) + '</tbody>';
+  const gapT = R.exp - R.target;
+  const tblFc = head
+    + tr('更新対象', cN(C.n), R.base)
+    + tr('確定して残った', '—', R.retained)
+    + tr('未決着', cN(C.pend), R.pend, {cls:'muted'})
+    + tr('うち残る見込み', '—', R.pendExp, {row:'sub'})
+    + tr(`着地予測（${endW}）`, '—', R.exp)
+    + tr('目標（94.36%）', '—', R.target)
+    + tr('目標との差', '—', gapT, {cls: gapT>=0?'up':'dn', sign:true, row:'sum'}) + '</tbody>';
+  const nv = v => v==null ? '' : `<span class="nrrv ${v>=NRR_TARGET?'ok':'ng'}">NRR ${pct(v)}</span>`;
+  /* 2026-11-10 深津さん：カスタマーチャーン（目標12%）とNRC（目標5.64%）を目標と並べる。どちらも金額ベース・分母は更新対象の年額。低いほど良い */
+  const CHURN_GOAL = 0.12, NRC_GOAL = NRC_TARGET;
+  const rt = (v, d) => v==null ? '—' : (v*100).toFixed(d)+'%';
+  const kr = (lab, goal, v, d, how) => `<tr><td style="text-align:left" data-tip="${esc(how)}">${lab}</td><td class="num">${rt(goal,d)}<div class="muted" style="font-size:10.5px;font-weight:400">${goal===CHURN_GOAL ? (CN.n? (CN.n*goal).toFixed(1)+'社まで':'') : mn(R.base*goal)+'まで'}</div></td><td class="num"><b class="${v!=null&&v<=goal?'up':'dn'}">${rt(v,d)}</b></td><td class="num ${v!=null&&v<=goal?'up':'dn'}">${v==null?'—':(v<=goal?'−':'+')+(Math.abs(v-goal)*100).toFixed(d)+'pt'}</td></tr>`;
+  const khead = col => `<thead><tr><th style="text-align:left">指標</th><th>目標</th><th>${col}</th><th>差</th></tr></thead><tbody>`;
+  const CN = R.cnt || {};
+  const cDec = CN.n ? CN.churn/CN.n : null, nDec = R.base ? (R.churn + R.down - R.up)/R.base : null;
+  const lossPend = Math.max(0, R.pend - R.pendExp);
+  const pendChurnN = R.pend ? (CN.pend||0) * lossPend / R.pend : 0;   /* 未決着のうち解約になる見込みの社数（未決着の社数 × 解約見込みの金額の割合で近似） */
+  const cFc = CN.n ? ((CN.churn||0) + pendChurnN)/CN.n : null, nFc = R.base ? (R.base - R.exp)/R.base : null;
+  const kDec = khead('確定') + kr('カスタマーチャーン', CHURN_GOAL, cDec, 1, 'カスタマーチャーン（社数）＝ 解約した社数 ÷ 更新対象の社数（決まった解約だけ）。目標の下は目標内に収まる解約の社数') + kr('NRC', NRC_GOAL, nDec, 2, 'NRC（ネットレベニューチャーン）＝（解約 ＋ ダウンセル － アップセル）÷ 更新対象の年額（決まった分だけ）') + '</tbody>';
+  const kFc = khead('見通し') + kr('カスタマーチャーン', CHURN_GOAL, cFc, 1, 'カスタマーチャーン（社数・見通し）＝（解約した社数 ＋ 未決着のうち解約になる見込みの社数）÷ 更新対象の社数。見込みの社数＝未決着の社数 × 解約見込みの金額の割合（更新予定10%・危険80%・不明/空欄30%で重みづけ）') + kr('NRC', NRC_GOAL, nFc, 2, 'NRC（ネットレベニューチャーン・見通し）＝（更新対象 － 着地予測）÷ 更新対象の年額 ＝ 1 － 見通しNRR') + '</tbody>';
   document.getElementById('apK').innerHTML = `
     <div class="nb-grid">
-      <div class="nb-card ${R.nrr!=null&&R.nrr>=NRR_TARGET?'ok':'ng'}">
-        <div class="nb-t"><span><i class="ti ti-lock"></i> 確定</span>${judge(R.nrr,false)}<span class="nb-q" data-tip="${esc(tip('実績NRR（確定ベース）', '（更新して残ったARR ＋ アップセル）÷ 決着した契約の母数', `=（${mn(R.kept)} ＋ ${mn(R.up)}）÷ ${mn(decB)} = ${pct(R.nrr)}`, 'すでに更新・解約が決まった契約だけで見た実績。アップセル＝更新時の増額＋途中のオプション追加、ダウンセル＝更新時の減額＋途中終了。'+(S.period==='月'?'単月はぶれやすいので、判断は四半期・半期・年間で':'')))}"></span></div>
-        <div class="nb-v"><b class="num">${vDec}</b>${gDec}</div>
-        ${bullet(R.nrr, S.rcAmt!=='off' ? mn((R.base-R.pend)*NRR_TARGET) : '94.49%')}
-        <div class="nb-s">決着した ${yen(decB)} のうち <b>${yen(R.retained)}</b> が残った（NRC ${R.nrr==null?'—':pct(1-R.nrr,2)}）</div>
-        <div class="nb-m">${one('解約',-R.churn,'dn')}${one('ダウンセル',-R.down,'dn')}${one('アップセル',R.up,'up')}</div>
+      <div class="nb-card">
+        <div class="nb-t"><span><i class="ti ti-lock"></i> 確定 ${nv(R.nrr)}</span><span class="nb-q" data-tip="${esc(tip('確定（決まった分だけ）', '更新・解約が決まった契約の実績', `確定NRR ＝（更新して残ったARR ＋ アップセル）÷ 決着した契約の母数 ＝（${mn(R.kept)} ＋ ${mn(R.up)}）÷ ${mn(decB)} ＝ ${pct(R.nrr)}`, '年額＝契約金額を12か月に直した額（ARR）、月額＝年額÷12。更新済み＝更新が決まった契約の更新前の年額。アップセル・ダウンセル＝更新時の増減。'+(S.period==='月'?'単月はぶれやすいので、判断は四半期・半期・年間で':'')))}"></span></div>
+        <div class="tbl-wrap"><table class="nb-tbl">${tblDec}</table></div>
+        <div class="tbl-wrap" style="margin-top:6px"><table class="nb-tbl nb-kpi">${kDec}</table></div>
       </div>
-      <div class="nb-card ${R.nrrFc!=null&&R.nrrFc>=NRR_TARGET?'ok':'ng'}">
-        <div class="nb-t"><span><i class="ti ti-telescope"></i> 見通し（${endW}）</span>${judge(R.nrrFc,true)}<span class="nb-q" data-tip="${esc(tip(`${endW}着地予測NRR（見通しベース）`, '（確定して残ったARR ＋ 未決着 ×（更新予定80%・危険20%・不明/空欄50%））÷ 更新対象ARR', `=（${mn(R.retained)} ＋ ${mn(R.pPlan)}×0.8 ＋ ${mn(R.pDanger)}×0.2 ＋ ${mn(R.pOther)}×0.5）÷ ${mn(R.base)} = ${pct(R.nrrFc)}`, '未決着の更新見込は契約DBのDBタブ「更新見込_CS管理」。まだ決まっていない分を慎重に見積もる'))}"></span></div>
-        <div class="nb-v"><b class="num">${vFc}</b>${gFc}</div>
-        ${bullet(R.nrrFc, S.rcAmt!=='off' ? mn(R.target) : '94.49%')}
-        <div class="nb-s">着地予測 <b>${yen(R.exp)}</b> ／ 目標 ${yen(R.target)}（未決着 ${yen(R.pend)} を見込みで計算）</div>
-        <div class="nb-m"><span class="nb-need ${needUp>0?'':'ok'}" data-tip="${esc(tip('目標まで必要なアップセル','着地目標 － 着地予測',`= ${mn(R.target)} － ${mn(R.exp)} = ${needUp>0?yen(needUp):'0'}`,`クロスセル（単発）はNRRに入らない（${P.short} ${yen(R.cross)}）`))}"><i class="ti ti-arrow-up-right"></i> <b>${needUp>0?(AMT?yen(needUp):(R.base?(needUp/R.base*100).toFixed(1):'0')+'%'):'0'}</b></span></div>
+      <div class="nb-card">
+        <div class="nb-t"><span><i class="ti ti-telescope"></i> 見通し（${endW}） ${nv(R.nrrFc)}</span><span class="nb-q" data-tip="${esc(tip(`${endW}の見通し`, '確定して残ったARR ＋ 未決着のうち残る見込み', `未決着の見込み ＝ 更新予定 ${mn(R.pPlan)}×0.9 ＋ 危険 ${mn(R.pDanger)}×0.2 ＋ 不明・空欄 ${mn(R.pOther)}×0.7 ＝ ${mn(R.pendExp)}`, '目標＝更新対象×94.36%。未決着の更新見込はCS管理の「更新見込」'))}"></span></div>
+        <div class="tbl-wrap"><table class="nb-tbl">${tblFc}</table></div>
+        <div class="tbl-wrap" style="margin-top:6px"><table class="nb-tbl nb-kpi">${kFc}</table></div>
       </div>
     </div>`;
-  const on = ms => ms.some(m=>P.ms.includes(m));
-  // 推移グラフ（累計）：横軸は選んだ単位。年間は月次
-  const TB = nrrBuckets(S.period==='年'?'月':S.period), TS = TB.map(b=>nrrStat(key,b.ms));
-  const ci = TB.findIndex(b=>b.ms.includes(CUR));
-  let cT=0,cA=0,cE=0,cB=0; const cum = TS.map((s,i)=>{ cT+=s.target; cB+=s.base; cE+=s.exp; cA+= i<=ci ? s.retained : 0; return {t:cT,b:cB,e:cE,a:cA}; });
-  // 予測：当期の未決着の見込み＋その先の期間の着地予測を積み上げ／必要ペース：当期の実績から、残りの満了額の割合で期末目標まで
-  const bNow = cum[ci].b, tEnd = cum[cum.length-1].t, bEnd = cum[cum.length-1].b;
-  const fc = cum.map((c,i)=> i<ci ? null : cum[ci].a + TS[ci].pendExp + TS.slice(ci+1,i+1).reduce((a,s)=>a+s.exp,0));
-  if(ci>0) fc[ci-1] = cum[ci-1].a;   // 予測の点線を前の期間の実績からつなげる
-  const need = cum.map((c,i)=> i<ci ? null : i===ci ? cum[ci].a : cum[ci].a + (tEnd - cum[ci].a) * (bEnd-bNow ? (c.b - bNow)/(bEnd-bNow) : 1));
-  const o = baseOpts(); o.scales.y.ticks.callback=v=>(v/1e8).toFixed(1)+'億'; o.interaction={mode:'index',intersect:false};
-  o.plugins.tooltip.callbacks={label:c=>c.raw==null?'':`${c.dataset.label}: ${yen(c.raw)}`};
-  o.onClick=(e,els)=>{ if(els.length) nrrDrawer(key, els[0].index, S.period==='年'?'月':S.period); };
-  o.onHover=(e,els)=>{ e.native.target.style.cursor = els.length?'pointer':'default'; };
-  mk('cAP',{data:{labels:TB.map(b=>b.lab),datasets:[
-    {type:'line',label:'目標（満了額×94.49%の累計）',data:cum.map(c=>c.t),borderColor:'#6FA9F6',backgroundColor:'rgba(37,117,240,.08)',borderDash:[6,5],borderWidth:2,pointRadius:0,fill:'origin',tension:0,order:4},
-    {type:'line',label:'実績（確定して残ったARR）',data:cum.map((c,i)=>i<=ci?c.a:null),borderColor:'#062A52',backgroundColor:'#062A52',borderWidth:4,pointRadius:TB.map((b,i)=>i<=ci?(on(b.ms)?7:3):0),tension:.2,order:1},
-    {type:'line',label:'予測（契約ベース）',data:fc,borderColor:'#2575F0',backgroundColor:'#2575F0',borderDash:[3,4],borderWidth:2.5,pointRadius:TB.map((b,i)=>i>=ci&&on(b.ms)?6:0),tension:0,order:2},
-    {type:'line',label:'必要ペース',data:need,borderColor:'#A8B2C1',backgroundColor:'#A8B2C1',borderDash:[2,3],borderWidth:1.6,pointRadius:0,tension:0,order:3}
-  ]},options:o});
+  /* 2026-11-10 NRRの推移（累計）のグラフは外した（深津さん） */
   // 内訳：選んだ期間のNRRブリッジ（滝グラフ）。更新対象ARR → 解約 → ダウンセル → アップセル → 未決着 → 残ったARR（確定）→ 着地予測（見通し）
   //   縦軸：A＝母数の70%付近から（増減が見える）／B＝0円から。モックでは切り替えて比較
   S.wfAxis = 'B';   // 2026-10-20 決定：縦軸は0から
@@ -754,13 +772,13 @@ function drawNrr(key){
   ob.onHover=(e,els)=>{ e.native.target.style.cursor = els.length && st[els[0].index].k!=='fc' ? 'pointer':'default'; };
   const tgt = { id:'wfTgt', afterDatasetsDraw(ch){ const c=ch.ctx, ys=ch.scales.y, xs=ch.scales.x, y=ys.getPixelForValue(R.target);
       c.save(); c.strokeStyle='#062A52'; c.setLineDash([5,4]); c.lineWidth=1.5; c.beginPath(); c.moveTo(ch.chartArea.left,y); c.lineTo(ch.chartArea.right,y); c.stroke();
-      c.setLineDash([]); c.fillStyle='#062A52'; c.font='bold 11px sans-serif'; c.textAlign='center'; c.fillText(`目標 ${mn(R.target)}（94.49%）`, xs.getPixelForValue(4), y-5);
+      c.setLineDash([]); c.fillStyle='#062A52'; c.font='bold 11px sans-serif'; c.textAlign='center'; c.fillText(`目標 ${mn(R.target)}（94.36%）`, xs.getPixelForValue(4), y-5);
       c.textAlign='center'; c.font='bold 12px sans-serif';
       [[5,R.nrr,'確定NRR'],[6,R.nrrFc,'見通しNRR']].forEach(([i,v,l])=>{ if(v==null) return; c.fillStyle = v>=NRR_TARGET?css('--success'):css('--danger');
         c.fillText(`${l} ${pct(v)}`, xs.getPixelForValue(i), ys.getPixelForValue(st[i].v)-8); });
       if(yMin>0){ c.fillStyle=css('--ink-faint'); c.font='10px sans-serif'; c.textAlign='left'; c.fillText(`※ 縦軸は ${mn(yMin)} から`, ch.chartArea.left+4, ch.chartArea.bottom-6); }
       c.restore(); } };
-  document.getElementById('wfTitle').textContent = `${P.short}のNRRブリッジ（目標 94.49%）`;
+  document.getElementById('wfTitle').textContent = `${P.short}のNRRブリッジ（目標 94.36%）`;
   mk('cNB',{type:'bar',data:{labels:st.map(s=>s.lab),datasets:[{data:wd,backgroundColor:st.map(s=>s.col),borderColor:st.map(s=>s.dash?'#2575F0':'transparent'),borderWidth:st.map(s=>s.dash?2:0),borderDash:[4,3],borderRadius:6,borderSkipped:false}]},options:ob,plugins:[tgt]});
 }
 
@@ -834,7 +852,7 @@ function periodOf(ms){
   return {short:`FY${fy}`, ms};
 }
 function cardPeriods(P){ const n=P.ms.length, out=[P]; for(let i=1;i<3;i++){ const s=ymAdd(P.ms[0],n*i); out.push(periodOf(Array.from({length:n},(_,k)=>ymAdd(s,k)))); } return out; }
-const RC_P = { plan: 0.8, danger: 0.2, other: 0.5 };
+const RC_P = { plan: 0.9, danger: 0.2, other: 0.7 };   /* 更新する確率。2026-11-10 深津さん：解約の見込みを 更新予定10%・危険80%・不明/空欄30% に（前は20%・80%・50%） */
 const CHURN_TARGET = 0.12;   // 目標：カスタマーチャーン（解約社数 ÷ 更新対象社数）12%未満（2026-10-20）   // 着地予想の更新確率（更新予定・危険・不明/空欄）
 function rcStats(key,P){
   const X = calcRen(key, P.ms);
@@ -877,7 +895,7 @@ function drawRenCards(key){
         const nd = done ? ['—','',''] : room<0 ? ['—','','dn'] : need===0 ? ['0社','','up'] : [`${need}社`,'',''];
         return `<div class="rates3 r3">
         <div data-tip="${esc(tip('カスタマーチャーン実績','解約が決まった社数 ÷ 対象社数',`= ${nn(X.churnN)} ÷ ${nn(X.n)} = ${pct(X.churnNow)}`,'目標：12%未満'))}"><div class="k">チャーン実績</div><div class="v num ${X.churnNow<CHURN_TARGET?'up':'dn'}">${pct(X.churnNow)}</div>${done?judge(X.churnNow):''}</div>
-        <div data-tip="${esc(tip(`${endW}着地予想（カスタマーチャーン）`,'（解約確定 ＋ 更新予定×20% ＋ 危険×80% ＋ 不明・空欄×50%）÷ 対象社数',`=（${nn(X.churnN)} ＋ ${nn(X.nPlan)}×0.2 ＋ ${nn(X.nDanger)}×0.8 ＋ ${nn(X.nOther)}×0.5）÷ ${nn(X.n)} = ${pct(X.churnLand)}`,'未決着の見込みは契約DBのDBタブ「更新見込_CS管理」で判断。目標：12%未満（11%は達成、12%以上は未達成）'))}"><div class="k">${endW}着地</div><div class="v num ${X.churnLand<CHURN_TARGET?'up':'dn'}">${pct(X.churnLand)}</div>${done?'':judge(X.churnLand)}</div>
+        <div data-tip="${esc(tip(`${endW}着地予想（カスタマーチャーン）`,'（解約確定 ＋ 更新予定×10% ＋ 危険×80% ＋ 不明・空欄×30%）÷ 対象社数',`=（${nn(X.churnN)} ＋ ${nn(X.nPlan)}×0.1 ＋ ${nn(X.nDanger)}×0.8 ＋ ${nn(X.nOther)}×0.3）÷ ${nn(X.n)} = ${pct(X.churnLand)}`,'未決着の見込みは契約DBのDBタブ「更新見込_CS管理」で判断。目標：12%未満（11%は達成、12%以上は未達成）'))}"><div class="k">${endW}着地</div><div class="v num ${X.churnLand<CHURN_TARGET?'up':'dn'}">${pct(X.churnLand)}</div>${done?'':judge(X.churnLand)}</div>
         <div data-tip="${esc(tip('達成に必要な更新社数','未決着の企業のうち、何社更新すればカスタマーチャーン12%未満になるか',`解約の上限 ＝ 12%未満に収まる最大の解約社数 ＝ ${maxC}社（${nn(X.n)}社の12%未満）
 解約確定 ${nn(X.churnN)}社 → あと${Math.max(0,room)}社まで解約しても達成
 必要な更新 ＝ 未決着${nn(X.pendN)}社 － ${Math.max(0,room)}社 ＝ ${need}社`))}"><div class="k">必要な更新</div><div class="v num ${nd[2]}">${nd[0]}</div></div>
