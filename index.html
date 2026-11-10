@@ -116,6 +116,8 @@
   tbody tr{ cursor:pointer; transition:background .2s; }
   tbody tr:hover{ background:var(--surface-2); }
   tr.sel{ background:rgba(58,120,181,.10) !important; }
+  /* 行動量のメンバー別：件数だけ大きく（2026-11-10） */
+  #actTbl td.num{ font-size:17px; }
   .bar-cell{ display:inline-block; height:6px; border-radius:3px; background:var(--brand-mid); opacity:.55; vertical-align:middle; margin-right:6px; }
   .pill{ display:inline-block; font-size:10.5px; font-weight:700; padding:2px 8px; border-radius:9999px; }
   .p-danger{ background:rgba(217,101,92,.14); color:var(--danger); } .p-warn{ background:rgba(217,140,74,.15); color:var(--warm); } .p-gray{ background:var(--hair); color:var(--ink-soft); }
@@ -485,9 +487,8 @@
   <section id="sec-activity" class="uix-sec">
   <div class="sec-t" id="hAct">行動量</div>
   <div class="grid g4 ds-rise" id="kAct"></div>
-  <div class="grid g2e" style="margin-top:14px">
-    <div class="card"><h3>月ごとの行動量</h3><div class="cap" id="actCap">ミーティング・通話・メールの件数（HubSpot）。選んだ期間の月を強調</div><div class="chart"><canvas id="cAct"></canvas></div></div>
-    <div class="card"><h3 id="actTblTitle">メンバー別</h3><div class="cap">行をクリックするとそのメンバーに絞り込みます</div><div class="tbl-wrap"><table id="actTbl"></table></div></div>
+  <div style="margin-top:14px">
+    <div class="card"><h3 id="actTblTitle">メンバー別</h3><div class="cap">行をクリックするとそのメンバーに絞り込みます。件数をクリックするとミーティングの一覧を開きます。種類はミーティングの件名で分けています</div><div class="tbl-wrap"><table id="actTbl"></table></div></div>
   </div>
   </section>
   <div hidden>
@@ -1240,31 +1241,39 @@ function drawCmp(P){
 function calcAct(key, ms){
   const U=(D.act||{})[key]||{}; const s=k=>ms.reduce((a,m)=>a+((U[m]||{})[k]||0),0);
   const done = ms.filter(m=>m<=CUR);                                   // 来月以降は数えない
-  const x={ mtg:s('mtg'), call:s('call'), conn:s('conn'), mail:s('mail'), plan:s('plan'), att:s('att') };
+  const x={ mtg:s('mtg'), call:s('call'), conn:s('conn'), mail:s('mail'), plan:s('plan'), att:s('att'), touch:s('touch'), attPlan:s('attPlan') };   /* touch＝接触（通話時間1分30秒以上の通話。2026-11-10） */
   x.total = x.mtg+x.call+x.mail;
   x.pm = done.reduce((a,m)=>a+((U[m]||{}).people||0),0);             // 人月（その月に活動した人の数を月ごとに足したもの）
   x.nm = done.length;
   return x;
 }
 /* ミーティングの一覧（行動量の件数をクリック）。誰が・いつ・どの会社と・何のミーティングをしたか */
-const ACT_K = {'主催':'主催したミーティング','同席':'同席したミーティング','予定':'このあと予定のミーティング'};
-function actOpen(kind, mem){
+const ACT_K = {'合算':'ミーティング（主催＋同席・実施済み＋実施予定）','主催':'主催したミーティング','同席':'同席したミーティング','予定':'このあと予定のミーティング（主催）','同席予定':'このあと同席予定のミーティング','同席計':'同席したミーティング（実施済み＋予定）'};
+const ACT_ALL = ['主催','同席','予定','同席予定'];   /* 2026-11-10 累計＝主催＋同席（実施済み＋予定）。メンバーごとのお打ち合わせ量を見るため */
+const ACT_ST = x => (x.k==='予定'||x.k==='同席予定') ? '実施予定' : '実施済み';   /* 合算のときは担当者ではなく実施済み／実施予定で分ける（2026-11-10） */
+/* ミーティングの種類（件名で分ける。「本日の商談」の自動投稿と同じルール。2026-11-10 相談会と更新MTGを1つに）：キックオフ → キックオフ／オンボーディング・初期設定・設定・導入 → オンボーディング中／それ以外 → 相談会・更新MTG */
+const MCAT = {KO:'キックオフ', ON:'オンボーディング中', SO:'相談会・更新MTG'};
+const mcat = ti => { ti=String(ti||''); return /キックオフ/.test(ti)?'KO' : /オンボーディング|初期設定|設定|導入/.test(ti)?'ON' : 'SO'; };
+function actOpen(kind, mem, cat){
   rcClose(); const P = S.actP; if(!P) return;
-  const L = (D.mlist||[]).filter(x=>P.ms.includes(x.m) && x.k===kind && (mem ? x.member===mem : inScope(x)));
-  const g={}; L.forEach(x=>{ (g[x.member]||(g[x.member]=[])).push(x); });
-  const os=Object.keys(g).sort((a,b)=>g[b].length-g[a].length||a.localeCompare(b,'ja'));
+  const SUM = kind==='合算' || kind==='同席計', KS = kind==='同席計' ? ['同席','同席予定'] : ACT_ALL;
+  const L = (D.mlist||[]).filter(x=>P.ms.includes(x.m) && (SUM ? KS.includes(x.k) : x.k===kind) && (mem ? x.member===mem : inScope(x)) && (!cat || mcat(x.ti)===cat));
+  const gk = x => SUM ? ACT_ST(x) : x.member;
+  const g={}; L.forEach(x=>{ (g[gk(x)]||(g[gk(x)]=[])).push(x); });
+  if(SUM && g['実施予定']) g['実施予定'].sort((a,b)=>a.d.localeCompare(b.d));   /* 予定は近い順 */
+  const os=SUM ? ['実施済み','実施予定'].filter(k=>g[k]) : Object.keys(g).sort((a,b)=>g[b].length-g[a].length||a.localeCompare(b,'ja'));
   const who = mem || (S.scope==='全体'?'全体':(S.scope==='CS'||S.scope==='PS')?S.scope:S.name);
-  const tabs = Object.keys(ACT_K).map(k=>`<button class="chip ${k===kind?'on':''}" data-actk="${k}">${k}</button>`).join('');
+  const tabs = Object.keys(ACT_K).map(k=>`<button class="chip ${k===kind?'on':''}" data-actk="${k}">${k==='合算'?'すべて（主催＋同席）':k==='同席計'?'同席（実施済み＋予定）':k}</button>`).join('');
   const tbl = (only) => `<div class="tbl-wrap"><table class="rct"><thead><tr><th>日時</th><th>会社名</th><th>件名</th><th>主催</th><th>同席</th><th>結果</th></tr></thead><tbody>${
-    (only?[only]:os).map(o=>`<tr class="grp"><td colspan="6">${esc(o)}（${g[o].length}件）</td></tr>`+g[o].map(x=>`<tr><td class="num" style="white-space:nowrap">${esc(x.d)}</td><td>${x.url?`<a href="${esc(x.url)}" target="_blank" rel="noopener noreferrer">${esc(x.cn||'（会社なし）')}</a>`:esc(x.cn||'（会社なし）')}</td><td>${esc(x.ti)}</td><td>${esc(x.host)}</td><td>${esc(x.with)||'—'}</td><td>${esc(x.res)}</td></tr>`).join('')).join('')
+    (only?[only]:os).map(o=>`<tr class="grp"><td colspan="6">${esc(o)}（${g[o].length}件）</td></tr>`+g[o].map(x=>`<tr><td class="num" style="white-space:nowrap">${esc(x.d)}</td><td>${x.url?`<a href="${esc(x.url)}" target="_blank" rel="noopener noreferrer">${esc(x.cn||'（会社なし）')}</a>`:esc(x.cn||'（会社なし）')}</td><td>${SUM?`<span class="pill ${x.k.includes('同席')?'p-gray':'p-ok'}" style="margin-right:6px">${x.k.includes('同席')?'同席':'主催'}</span>`:''}${esc(x.ti)}</td><td>${esc(x.host)}</td><td>${esc(x.with)||'—'}</td><td>${esc(x.res)}</td></tr>`).join('')).join('')
     || '<tr><td colspan="6" style="color:var(--ink-faint)">該当するミーティングはありません</td></tr>'}</tbody></table></div>`;
   const chips = `<div class="rc-chips"><button class="chip on" data-actown="">すべて ${L.length}</button>${os.map(o=>`<button class="chip" data-actown="${esc(o)}">${esc(o)} ${g[o].length}</button>`).join('')}</div>`;
-  document.body.insertAdjacentHTML('beforeend',`<div class="rc-drawer" data-rcx-bg><div class="rc-dbox"><div class="rc-mh"><div><h3>${P.short}の${ACT_K[kind]}（${esc(who)}・${L.length}件）</h3><div class="cap">担当者ごと（新しい順）。会社名をクリックするとHubSpotの会社ページを開きます。主催＝会社の所有者（ミーティング当日）が出ていればその人、いなければホスト</div></div><button class="uix-btn" data-rcx><i class="ti ti-x"></i></button></div><div class="rc-chips">${tabs}</div>${chips}<div id="actDT">${tbl()}</div></div></div>`);
+  document.body.insertAdjacentHTML('beforeend',`<div class="rc-drawer" data-rcx-bg><div class="rc-dbox"><div class="rc-mh"><div><h3>${P.short}の${ACT_K[kind]}${cat?'：'+MCAT[cat]:''}（${esc(who)}・${L.length}件）</h3><div class="cap">${SUM?'実施済み（新しい順）と実施予定（近い順）に分けています。':'担当者ごと（新しい順）。'}会社名をクリックするとHubSpotの会社ページを開きます。主催＝会社の所有者（ミーティング当日）が出ていればその人、いなければホスト</div></div><button class="uix-btn" data-rcx><i class="ti ti-x"></i></button></div><div class="rc-chips">${tabs}</div>${chips}<div id="actDT">${tbl()}</div></div></div>`);
   requestAnimationFrame(()=>{ const d=document.querySelector('.rc-drawer'); if(d) d.classList.add('in'); });
   document.querySelectorAll('[data-actown]').forEach(b=>b.onclick=()=>{ document.querySelectorAll('[data-actown]').forEach(x=>x.classList.toggle('on',x===b)); document.getElementById('actDT').innerHTML=tbl(b.dataset.actown||null); });
-  document.querySelectorAll('[data-actk]').forEach(b=>b.onclick=()=>actOpen(b.dataset.actk, mem));
+  document.querySelectorAll('[data-actk]').forEach(b=>b.onclick=()=>actOpen(b.dataset.actk, mem, (b.dataset.actk==='主催'||b.dataset.actk==='合算')?cat:null));
 }
-document.addEventListener('click',e=>{ const a=e.target.closest('[data-act]'); if(!a) return; e.preventDefault(); e.stopPropagation(); const [k,m]=a.dataset.act.split('|'); actOpen(k, m||null); }, true);
+document.addEventListener('click',e=>{ const a=e.target.closest('[data-act]'); if(!a) return; e.preventDefault(); e.stopPropagation(); const [k,m,c]=a.dataset.act.split('|'); actOpen(k, m||null, c||null); }, true);
 function drawAct(key,P){
   const span = `<span style="font-weight:500;color:var(--ink-faint);letter-spacing:0;margin-left:6px">`;
   const who = S.scope==='全体'?'全体':(S.scope==='CS'||S.scope==='PS')?S.scope:S.name;
@@ -1288,31 +1297,21 @@ function drawAct(key,P){
       tip('メール', 'HubSpotのメールのうち送信・転送の件数', `= ${nn(x.mail)}件`, '受信メールは数えない。'+avgTip)) +
     kpi(`${P.short}の合計`, nn(x.total)+unit, avg(x.total), 'b-warm',
       tip('合計', 'ミーティング ＋ 通話 ＋ メール', `= ${nn(x.mtg)} ＋ ${nn(x.call)} ＋ ${nn(x.mail)} = ${nn(x.total)}件`, 'メモ・タスクは数えない。CTSとしての活動（兼務者のチケットに紐づく通話・メール）と、CSに来る前の活動は含めない'));
-  // 月ごとの推移（積み上げ棒＋つながった通話の線）。月別表示では年度の中で選んだ月を強調
-  const SH = P.ms.length>1 ? P.ms : M, on = m => P.ms.includes(m);
-  const U=(D.act||{})[key]||{}; const g=(m,k)=>m>CUR?null:((U[m]||{})[k]||0);
-  const fade = (m,c) => on(m) ? c : c.replace(/[\d.]+\)$/,'0.25)');
-  const o=baseOpts(); o.scales.x.stacked=true; o.scales.y.stacked=true; o.scales.y.ticks.callback=v=>v.toLocaleString('ja-JP');
-  o.plugins.tooltip.callbacks={label:c=>c.raw==null?'':`${c.dataset.label}: ${c.raw.toLocaleString('ja-JP')}件`};
-  mk('cAct',{ data:{ labels:SH.map(m=>parseInt(m.slice(5))+'月'), datasets:[
-    {type:'bar',label:'ミーティング',data:SH.map(m=>g(m,'mtg')),backgroundColor:SH.map(m=>fade(m,'rgba(37,117,240,.9)')),borderRadius:4,stack:'a'},
-    {type:'bar',label:'通話',data:SH.map(m=>g(m,'call')),backgroundColor:SH.map(m=>fade(m,'rgba(35,201,255,.85)')),borderRadius:4,stack:'a'},
-    {type:'bar',label:'メール',data:SH.map(m=>g(m,'mail')),backgroundColor:SH.map(m=>fade(m,'rgba(167,204,251,.95)')),borderRadius:4,stack:'a'},
-    {type:'bar',label:'ミーティング予定',data:SH.map(m=>{const v=(U[m]||{}).plan||0; return v||null;}),backgroundColor:SH.map(m=>fade(m,'rgba(58,120,181,.25)')),borderColor:css('--brand-mid'),borderWidth:1,borderDash:[4,3],borderRadius:4,stack:'a'},
-    {type:'line',label:'つながった通話',data:SH.map(m=>g(m,'conn')),borderColor:'#062A52',backgroundColor:'#062A52',tension:.3,pointRadius:SH.map(m=>on(m)?5:2),stack:'b'}
-  ]}, options:o });
   // メンバー別（選んだ単位に入るCS・PSのメンバー）
   let rows;
   if(S.scope==='チーム') rows=members.filter(m=>D.meta.members[m]===S.name);
   else if(isMem){ const t=D.meta.members[S.name]; rows=members.filter(m=>D.meta.members[m]===t); }
   else rows=members.filter(m=>S.scope==='全体'||(D.meta.teams[D.meta.members[m]]||{}).juris===S.scope);
-  const data=rows.map(n=>({n,t:D.meta.members[n],y:calcAct('メンバー:'+n,P.ms)})).filter(d=>d.y.total>0||d.y.plan>0||d.y.att>0).sort((a,b)=>b.y.total-a.y.total);
+  const data=rows.map(n=>({n,t:D.meta.members[n],y:calcAct('メンバー:'+n,P.ms)})).filter(d=>d.y.total>0||d.y.plan>0||d.y.att>0||d.y.attPlan>0).sort((a,b)=>(b.y.mtg+b.y.plan+b.y.att+b.y.attPlan)-(a.y.mtg+a.y.plan+a.y.att+a.y.attPlan)||b.y.total-a.y.total);   /* ミーティング累計の多い順 */
   document.getElementById('actTblTitle').textContent = (S.scope==='チーム'?S.name+' の':isMem?D.meta.members[S.name]+' の':'')+`メンバー別（${P.short}）`;
-  const maxT=Math.max(...data.map(d=>d.y.total),1);
-  document.getElementById('actTbl').innerHTML = data.length? `<thead><tr><th style="text-align:left">メンバー</th><th>ミーティング</th><th data-tip="同席||HubSpotのミーティングの参加者として入った件数（主催は除く）。稼働量として見る。合計には入れない">同席</th><th>通話</th><th>つながった</th><th>メール</th><th>合計</th><th data-tip="ミーティング予定||日時が今より先のミーティング（この期間内）">予定</th><th data-tip="月平均||合計 ÷ CSMとして活動した月数">月平均</th></tr></thead><tbody>`+
-    data.map(({n,t,y})=>`<tr data-n="${esc(n)}" class="${S.name===n?'sel':''}" style="cursor:pointer"><td style="text-align:left"><b>${esc(n)}</b><span style="color:var(--ink-faint);font-size:11px;margin-left:6px">${esc(t)}</span></td>
-      <td class="num">${y.mtg?al('主催', nn(y.mtg), n):'0'}</td><td class="num" style="color:var(--ink-soft)">${y.att?al('同席', nn(y.att), n):'—'}</td><td class="num">${nn(y.call)}</td><td class="num">${nn(y.conn)}</td><td class="num">${nn(y.mail)}</td>
-      <td class="num"><span class="bar-cell" style="width:${y.total/maxT*50}px"></span>${nn(y.total)}</td><td class="num" style="color:var(--brand-mid)">${y.plan?al('予定', nn(y.plan), n):'—'}</td><td class="num">${y.pm?(y.total/y.pm).toFixed(0):'—'}</td></tr>`).join('')+'</tbody>'
+  /* ミーティングの種類別（主催したミーティングを件名で分ける） */
+  data.forEach(d=>{ const c={KO:0,ON:0,SO:0}; (D.mlist||[]).forEach(x=>{ if(x.member===d.n && ACT_ALL.includes(x.k) && P.ms.includes(x.m)) c[mcat(x.ti)]++;   /* 主催＋同席・実施済み＋これからの予定（2026-11-10） */ }); d.c=c; });
+  const cl = (n, k) => { const v=(data.find(d=>d.n===n)||{}).c[k]||0; return v?`<a class="actl" data-act="合算|${esc(n)}|${k}">${nn(v)}</a>`:'<span style="color:var(--ink-faint)">0</span>'; };
+  document.getElementById('actTbl').innerHTML = data.length? `<thead><tr><th style="text-align:left">メンバー</th><th data-tip="ミーティング累計||主催＋同席したミーティングの件数（実施済み＋この期間内のこれからの予定）。同じ打ち合わせに2人出ていれば2人ともに1件。キックオフ〜相談会・更新MTGの合計。クリックすると実施済みと実施予定に分けて表示">ミーティング累計</th><th data-tip="キックオフ||件名に「キックオフ」を含む">キックオフ</th><th data-tip="オンボーディング中||件名に「オンボーディング」「初期設定」「設定」「導入」を含む（キックオフを除く）">オンボーディング中</th><th data-tip="相談会・更新MTG||キックオフ・オンボーディング以外のミーティング（相談会・定例・お打ち合わせ・更新や解約の打ち合わせなど）">相談会・更新MTG</th><th data-tip="同席||同席したミーティング（実施済み＋予定）。ミーティング累計の内数。実施済み＝HubSpotの社内参加者、予定＝Googleカレンダーの社内ゲスト（辞退を除く）">同席</th><th>メール</th><th data-tip="通話||HubSpotの通話の件数（すべて）">通話</th><th data-tip="接触||通話時間が1分30秒以上の通話の件数">接触</th></tr></thead><tbody>`+
+    data.map(({n,t,y})=>`<tr data-n="${esc(n)}" class="${S.name===n?'sel':''}" style="cursor:pointer"><td style="text-align:left;white-space:nowrap"><b>${esc(n)}</b><span style="color:var(--ink-faint);font-size:11px;margin-left:6px">${esc(t)}</span></td>
+      <td class="num"><b>${(y.mtg+y.plan+y.att+y.attPlan)?al('合算', nn(y.mtg+y.plan+y.att+y.attPlan), n):'0'}</b></td><td class="num">${cl(n,'KO')}</td><td class="num">${cl(n,'ON')}</td><td class="num">${cl(n,'SO')}</td>
+      <td class="num" style="color:var(--ink-soft)">${(y.att+y.attPlan)?`<a class="actl" data-act="同席計|${esc(n)}">${nn(y.att+y.attPlan)}</a>`:'—'}</td><td class="num">${nn(y.mail)}</td><td class="num">${nn(y.call)}</td>
+      <td class="num">${nn(y.touch)}</td></tr>`).join('')+'</tbody>'
     : `<tbody><tr><td style="color:var(--ink-faint)">この期間の行動量はありません</td></tr></tbody>`;
   document.querySelectorAll('#actTbl tbody tr[data-n]').forEach(tr=>tr.onclick=(e)=>{ if(e.target.closest('[data-act]')) return; S.scope='メンバー'; S.name=tr.dataset.n; syncScope(); render(); jump('sec-activity'); });
 }
