@@ -969,7 +969,7 @@ function drawRenCards(key){
     return `<div class="card rc ${i===0?'on':''}">${head}
       <a class="rcl big num" data-rcl="${i}|all"><span class="lbl" data-tip="${tipT}">対象${amt?'ARR':''}</span>${amt?`${mn(X.arr)}<small>（${nn(X.n)}社）</small>`:`${nn(X.n)}<small>社</small>`}</a>
       <div class="rbar" title="社数の内訳">${seg(X.renN,X.churnN,X.pendN,X.n)}</div>
-      <div class="rrows">${row('ren','更新',X.renTot,X.renN,'var(--brand)')}${row('churn','解約',X.churn,X.churnN,'var(--danger)')}${row('pend','未決着',X.pend,X.pendN,'var(--gray-300)')}</div>
+      <div class="rrows">${row('ren','更新',X.renPre,X.renN,'var(--brand)')}${row('churn','解約',X.churn,X.churnN,'var(--danger)')}${row('pend','未決着',X.pend,X.pendN,'var(--gray-300)')}</div>
       ${(()=>{ const maxC=Math.ceil(CHURN_TARGET*X.n)-1, room=maxC-X.churnN, need=Math.max(0,X.pendN-room);
         const nd = done ? ['—','',''] : room<0 ? ['—','','dn'] : need===0 ? ['0社','','up'] : [`${need}社`,'',''];
         return `<div class="rates3 r3">
@@ -1404,11 +1404,10 @@ function drawAct(key,P){
   /* ミーティングの種類別（主催したミーティングを件名で分ける） */
   data.forEach(d=>{ const c={KO:0,ON:0,SO:0}; (D.mlist||[]).forEach(x=>{ if(x.member===d.n && ACT_ALL.includes(x.k) && P.ms.includes(x.m)) c[mcat(x.ti)]++;   /* 主催＋同席・実施済み＋これからの予定（2026-11-10） */ }); d.c=c; });
   const cl = (n, k) => { const v=(data.find(d=>d.n===n)||{}).c[k]||0; return v?`<a class="actl" data-act="合算|${esc(n)}|${k}">${nn(v)}</a>`:'<span style="color:var(--ink-faint)">0</span>'; };
-  document.getElementById('actTbl').innerHTML = data.length? `<thead><tr><th style="text-align:left">メンバー</th><th data-tip="ミーティング累計||主催＋同席したミーティングの件数（実施済み＋この期間内のこれからの予定）。同じ打ち合わせに2人出ていれば2人ともに1件。キックオフ〜相談会・更新MTGの合計。クリックすると実施済みと実施予定に分けて表示">ミーティング累計</th><th data-tip="キックオフ||件名に「キックオフ」を含む">キックオフ</th><th data-tip="オンボーディング中||件名に「オンボーディング」「初期設定」「設定」「導入」を含む（キックオフを除く）">オンボーディング中</th><th data-tip="相談会・更新MTG||キックオフ・オンボーディング以外のミーティング（相談会・定例・お打ち合わせ・更新や解約の打ち合わせなど）">相談会・更新MTG</th><th data-tip="同席||同席したミーティング（実施済み＋予定）。ミーティング累計の内数。実施済み＝HubSpotの社内参加者、予定＝Googleカレンダーの社内ゲスト（辞退を除く）">同席</th><th>メール</th><th data-tip="通話||HubSpotの通話の件数（すべて）">通話</th><th data-tip="接触||通話時間が1分30秒以上の通話の件数">接触</th></tr></thead><tbody>`+
+  document.getElementById('actTbl').innerHTML = data.length? `<thead><tr><th style="text-align:left">メンバー</th><th data-tip="ミーティング累計||主催＋同席したミーティングの件数（実施済み＋この期間内のこれからの予定）。同じ打ち合わせに2人出ていれば2人ともに1件。キックオフ〜相談会・更新MTGの合計。クリックすると実施済みと実施予定に分けて表示">ミーティング累計</th><th data-tip="キックオフ||件名に「キックオフ」を含む">キックオフ</th><th data-tip="オンボーディング中||件名に「オンボーディング」「初期設定」「設定」「導入」を含む（キックオフを除く）">オンボーディング中</th><th data-tip="相談会・更新MTG||キックオフ・オンボーディング以外のミーティング（相談会・定例・お打ち合わせ・更新や解約の打ち合わせなど）">相談会・更新MTG</th><th data-tip="同席||同席したミーティング（実施済み＋予定）。ミーティング累計の内数。実施済み＝HubSpotの社内参加者、予定＝Googleカレンダーの社内ゲスト（辞退を除く）">同席</th><th>メール</th></tr></thead><tbody>`+
     data.map(({n,t,y})=>`<tr data-n="${esc(n)}" class="${S.name===n?'sel':''}" style="cursor:pointer"><td style="text-align:left;white-space:nowrap"><b>${esc(n)}</b><span style="color:var(--ink-faint);font-size:11px;margin-left:6px">${esc(t)}</span></td>
       <td class="num"><b>${(y.mtg+y.plan+y.att+y.attPlan)?al('合算', nn(y.mtg+y.plan+y.att+y.attPlan), n):'0'}</b></td><td class="num">${cl(n,'KO')}</td><td class="num">${cl(n,'ON')}</td><td class="num">${cl(n,'SO')}</td>
-      <td class="num" style="color:var(--ink-soft)">${(y.att+y.attPlan)?`<a class="actl" data-act="同席計|${esc(n)}">${nn(y.att+y.attPlan)}</a>`:'—'}</td><td class="num">${nn(y.mail)}</td><td class="num">${nn(y.call)}</td>
-      <td class="num">${nn(y.touch)}</td></tr>`).join('')+'</tbody>'
+      <td class="num" style="color:var(--ink-soft)">${(y.att+y.attPlan)?`<a class="actl" data-act="同席計|${esc(n)}">${nn(y.att+y.attPlan)}</a>`:'—'}</td><td class="num">${nn(y.mail)}</td></tr>`).join('')+'</tbody>'
     : `<tbody><tr><td style="color:var(--ink-faint)">この期間の行動量はありません</td></tr></tbody>`;
   document.querySelectorAll('#actTbl tbody tr[data-n]').forEach(tr=>tr.onclick=(e)=>{ if(e.target.closest('[data-act]')) return; S.scope='メンバー'; S.name=tr.dataset.n; syncScope(); render(); jump('sec-activity'); });
 }
