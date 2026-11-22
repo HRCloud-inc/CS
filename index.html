@@ -526,7 +526,7 @@
   <div class="ap-note" id="apNote"></div>
   <div class="nrr-row">
     <div class="ds-rise" id="apK"></div>
-    <div class="card ds-rise nrr-ch"><h3><span id="wfTitle">NRRブリッジ</span><span class="help qtip" data-tip="NRRブリッジ||更新対象ARR（母数）→ 解約 → ダウンセル → アップセル → 未決着 → 残ったARR（確定）→ 着地予測（見通し）||赤い点線＝目標（母数×94.36%）。残ったARR（確定）と着地予測（見通し）がこの線を越えれば達成||棒をクリックするとその中身の企業一覧（サイドドロワー）">?</span><span class="clk"><i class="ti ti-pointer"></i> 棒で企業一覧</span></h3><div class="chart"><canvas id="cNB"></canvas></div></div>
+    <div class="card ds-rise nrr-ch"><h3><span id="wfTitle">NRRブリッジ</span><span class="help qtip" data-tip="NRRブリッジ||更新対象ARR（母数）→ 解約 → ダウンセル → アップセル → 未決着 → 残ったARR（確定）→ 着地予測（見通し）||赤い点線＝目標（母数×（1－NRC目標）。NRC目標は共通ルールの13期予算・期間ごと）。残ったARR（確定）と着地予測（見通し）がこの線を越えれば達成||棒をクリックするとその中身の企業一覧（サイドドロワー）">?</span><span class="clk"><i class="ti ti-pointer"></i> 棒で企業一覧</span></h3><div class="chart"><canvas id="cNB"></canvas></div></div>
   </div>
   <div hidden>
   <div class="sec-t" id="hTgt"></div><div id="tgt"></div><div class="sec-t" id="hArr"></div><div id="kArr"></div>
@@ -671,9 +671,9 @@ function calc(key, ms){
   r.n = NG ? { on:true, tgt:ng('tgt'), pend:ng('pend'), churn:ng('churn'), up:ng('up'), down:ng('down'), n:ng('n'), renN:ng('renN'), churnN:ng('churnN') }
            : { on:false, tgt:r.tgtArr, pend:0, churn:r.churn, up:r.up, down:r.down };
   r.n.dec = r.n.tgt - r.n.pend;                                         // 決着した分（更新＋解約）の年額
-  r.nrc2 = r.n.dec ? (r.n.churn + r.n.down - r.n.up)/r.n.dec : null;    // NRC（永井式）
+  r.nrc2 = r.n.tgt ? (r.n.churn + r.n.down - r.n.up)/r.n.tgt : null;    // NRC（永井式の金額・共通ルールの式＝÷更新対象金額。2026-11-22）
   r.nrr2 = r.nrc2==null ? null : 1 - r.nrc2;                            // NRR（更新ベース）
-  r.rc = r.n.dec ? (r.n.churn + r.n.down)/r.n.dec : null;               // レベニューチャーンレート
+  r.rc = r.n.tgt ? (r.n.churn + r.n.down)/r.n.tgt : null;               // レベニューチャーンレート（÷更新対象金額）
   r.cc1 = r.tgtIds ? r.churnIds/r.tgtIds : null;                        // カスタマーチャーンレート①
   r.cc2 = r.openIds ? r.churnIds/r.openIds : null;                      // カスタマーチャーンレート②
   // ARRブリッジ：期首＋新規＋US－DS－解約－未決着のまま満了＋要確認の動き＋担当替え＝期末（全体・管轄では担当替え＝0）
@@ -716,11 +716,17 @@ function calcRen(key, ms){
 }
 
 // ---------- NRR（売上継続率）：今期に満了する契約（期首からの顧客）の期首時点のARRを母数に、どれだけ残るか ----------
-//   新規受注・会社全体の目標は含めない。目標：NRC 5.64%以下 ＝ 母数 × 94.36% を維持
+//   新規受注・会社全体の目標は含めない。目標：共通ルール（kgi-kpi.md）の13期予算のNRC（月ごと）。期間は更新対象金額（予算）の重みで平均
 //   母数＝更新前ARR － 4月以降の途中追加 ＋ 4月以降の途中終了（期首時点に戻す：途中追加を二重に数えないため）
 //   アップセル＝更新時の増額 ＋ 契約途中のオプション追加（計上月）。ダウンセル＝更新時の減額 ＋ 途中終了。途中の増減は今期に満了する契約のものだけ
 //   予測＝確定分 ＋ 未決着 × 更新確率（更新予定90%・危険20%・不明/空欄70%）。クロスセル（単発）は計算ルールどおりNRRに入れず別に表示
-const NRC_TARGET = 0.0564, NRR_TARGET = 1 - NRC_TARGET;   /* 2026-11-10 深津さん：NRC目標5.64%（NRR 94.36%）に変更（前は5.51%） */
+/* 2026-11-22 深津さん：NRCの目標を共通ルール（SHARED/kgi-kpi.md・13期予算「週報報告用」13期予算タブ）に合わせる（前は一律5.64%）。
+   月＝その月の目標、四半期・半期・年間＝更新対象金額（予算・万円）の重みで平均（上期5.06%・下期5.26%・通期5.18%と一致） */
+const NRC_PLAN = {'2026-04':[5.52,3919],'2026-05':[5.83,4627],'2026-06':[6.41,5686],'2026-07':[3.51,4499],'2026-08':[3.37,4175],'2026-09':[5.20,6423],
+  '2026-10':[4.51,5337],'2026-11':[4.86,6129],'2026-12':[5.37,7112],'2027-01':[4.84,6124],'2027-02':[5.65,8173],'2027-03':[5.86,8382]};
+function nrcGoal(ms){ let a=0,w=0; (ms||[]).forEach(m=>{ const p=NRC_PLAN[m]; if(p){ a+=p[0]*p[1]; w+=p[1]; } }); return w ? a/w/100 : 0.0518; }
+let NRC_TARGET = nrcGoal(M), NRR_TARGET = 1 - NRC_TARGET;   /* 表示中の期間の目標（drawNrr で入れ替える） */
+const tPct = () => (NRR_TARGET*100).toFixed(2)+'%';
 function nrrStat(key, ms){
   const NG = (D.nagai||{})[key];
   if (NG) {   // 2026-10-30：永井式（CS管理の年額。期中の追加は入れない）
@@ -730,7 +736,7 @@ function nrrStat(key, ms){
     const kept = base - churnA - pendA - down, retained = kept + up;
     const pendExp = pPlan*RC_P.plan + pDanger*RC_P.danger + pOther*RC_P.other, exp = retained + pendExp, decBase = base - pendA;
     return { ms, base, churn:churnA, pend:pendA, up, down, upRen:up, downRen:down, midUp:0, midDown:0, kept, retained, pendExp, exp,
-      pPlan, pDanger, pOther, target: base*NRR_TARGET, nrr: decBase>0 ? retained/decBase : null, nrrFc: base ? exp/base : null,
+      pPlan, pDanger, pOther, target: base*(1-nrcGoal(ms)), nrr: base>0 ? (retained+pendA)/base : null, nrrFc: base ? exp/base : null,
       cross: ms.reduce((a,m)=>a+(calc(key,[m]).cross||0),0), done: !pendA, fut: ms[0] > CUR, nagai: true,
       cnt: { n:n('n'), ren:n('renN'), churn:n('churnN'), up:n('upN'), down:n('downN'), pend:n('pendN') } };   /* 社数（2026-11-10 確定・見通しの表に使う） */
   }
@@ -746,7 +752,7 @@ function nrrStat(key, ms){
   const exp = retained + pendExp;                                  // 着地予測
   const decBase = base - pendA;
   return { ms, base, churn:churnA, pend:pendA, up, down, upRen:X.up, downRen:X.down, midUp:g('midUp'), midDown:g('midDown'), kept, retained, pendExp, exp,
-    pPlan, pDanger, pOther, target: base*NRR_TARGET, nrr: decBase>0 ? retained/decBase : null, nrrFc: base ? exp/base : null,
+    pPlan, pDanger, pOther, target: base*(1-nrcGoal(ms)), nrr: base>0 ? (retained+pendA)/base : null, nrrFc: base ? exp/base : null,
     cross: ms.reduce((a,m)=>a+(calc(key,[m]).cross||0),0), done: !X.pend, fut: ms[0] > CUR };
 }
 // 選んだ単位の区切り（月・四半期・半期・年間）
@@ -762,15 +768,16 @@ function drawNrr(key){
   const who = S.scope==='全体'?'全体':(S.scope==='CS'||S.scope==='PS')?S.scope:S.name;
   const span = `<span style="font-weight:500;color:var(--ink-faint);letter-spacing:0;margin-left:6px">`;
   const endW = P.ms.length===1?'月末':'期末';
+  NRC_TARGET = nrcGoal(P.ms); NRR_TARGET = 1 - NRC_TARGET;   /* 2026-11-22：選んだ期間の目標 */
   const R = nrrStat(key, P.ms);
-  document.getElementById('hAP').innerHTML = `${P.short}のNRR（売上継続率）（${esc(who)}）${span}更新対象ARR <b style="color:var(--ink)">${yen(R.base)}</b> ／ 目標 NRR 94.36%以上 ＝ <b style="color:var(--ink)">${yen(R.target)}</b> を維持（新規は含めない）</span>${S.period==='月'?`<span class="mwarn" data-tip="${esc(tip('単月のNRRについて','単月のNRRは、契約途中のオプション追加が起きた月に入るため、ぶれやすい数字です','','判断は四半期・半期・年間で行うことをおすすめします'))}"><i class="ti ti-alert-circle"></i> 単月はぶれやすい</span>`:''}`;
+  document.getElementById('hAP').innerHTML = `${P.short}のNRR（売上継続率）（${esc(who)}）${span}更新対象ARR <b style="color:var(--ink)">${yen(R.base)}</b> ／ 目標 NRR ${tPct()}以上（NRC ${(NRC_TARGET*100).toFixed(2)}%以下・共通ルール）＝ <b style="color:var(--ink)">${yen(R.target)}</b> を維持（新規は含めない）</span>${S.period==='月'?`<span class="mwarn" data-tip="${esc(tip('単月のNRRについて','単月のNRRは、更新を迎える社数・金額が月ごとに大きく違うため、ぶれやすい数字です','','判断は四半期・半期・年間で行うことをおすすめします'))}"><i class="ti ti-alert-circle"></i> 単月はぶれやすい</span>`:''}`;
   document.getElementById('apNote').innerHTML = '';
   const needUp = Math.max(0, R.target - R.exp);
   const card = (k,v,s,cls,tp) => `<div class="ap-k ${cls||''}" ${tp?`data-tip="${esc(tp)}"`:''}><div class="k">${k}</div><div class="v num">${v}</div><div class="s">${s||''}</div></div>`;
   const monthWarn = S.period==='月' ? '\n※ 単月はぶれやすい。判断は四半期・半期・年間で' : '';
-  // 目標に対する実績を「確定ベース」と「見通しベース」の2枚で。バーは0〜110%、赤い印が目標94.36%
+  // 目標に対する実績を「確定ベース」と「見通しベース」の2枚で。バーは0〜110%、赤い印が目標（共通ルールの期間の目標）
   const bullet = (v, tl) => { const X = x => Math.max(0, Math.min(100, x/1.1)); const ok = v!=null && v>=NRR_TARGET;
-    return `<div class="nb-bar"><span class="fill ${ok?'ok':'ng'}" style="width:${v==null?0:X(v*100)}%"></span><i class="tg" style="left:${X(94.36)}%"></i><b class="tl" style="left:${X(94.36)}%">目標 ${tl}</b></div>`; };
+    return `<div class="nb-bar"><span class="fill ${ok?'ok':'ng'}" style="width:${v==null?0:X(v*100)}%"></span><i class="tg" style="left:${X(NRR_TARGET*100)}%"></i><b class="tl" style="left:${X(NRR_TARGET*100)}%">目標 ${tl}</b></div>`; };
   const judge = () => '';
   const gap = v => v==null ? '' : `<span class="${v>=NRR_TARGET?'up':'dn'}">${v>=NRR_TARGET?'+':'−'}${(Math.abs(v-NRR_TARGET)*100).toFixed(1)}pt</span>`;
   const decB = R.base - R.pend;
@@ -801,10 +808,10 @@ function drawNrr(key){
     + tr('未決着', cN(C.pend), R.pend, {cls:'muted'})
     + tr('うち残る見込み', '—', R.pendExp, {row:'sub'})
     + tr(`着地予測（${endW}）`, '—', R.exp)
-    + tr('目標（94.36%）', '—', R.target)
+    + tr(`目標（${tPct()}）`, '—', R.target)
     + tr('目標との差', '—', gapT, {cls: gapT>=0?'up':'dn', sign:true, row:'sum'}) + '</tbody>';
   const nv = v => v==null ? '' : `<span class="nrrv ${v>=NRR_TARGET?'ok':'ng'}">NRR ${pct(v)}</span>`;
-  /* 2026-11-10 深津さん：カスタマーチャーン（目標12%）とNRC（目標5.64%）を目標と並べる。どちらも金額ベース・分母は更新対象の年額。低いほど良い */
+  /* 2026-11-10 深津さん：カスタマーチャーン（目標12%・社数ベース）とNRC（目標＝共通ルールの期間の目標・金額ベース・分母は更新対象の年額）を目標と並べる。低いほど良い */
   const CHURN_GOAL = 0.12, NRC_GOAL = NRC_TARGET;
   const rt = (v, d) => v==null ? '—' : (v*100).toFixed(d)+'%';
   const kr = (lab, goal, v, d, how) => `<tr><td style="text-align:left" data-tip="${esc(how)}">${lab}</td><td class="num">${rt(goal,d)}<div class="muted" style="font-size:10.5px;font-weight:400">${goal===CHURN_GOAL ? (CN.n? (CN.n*goal).toFixed(1)+'社まで':'') : mn(R.base*goal)+'まで'}</div></td><td class="num"><b class="${v!=null&&v<=goal?'up':'dn'}">${rt(v,d)}</b></td><td class="num ${v!=null&&v<=goal?'up':'dn'}">${v==null?'—':(v<=goal?'−':'+')+(Math.abs(v-goal)*100).toFixed(d)+'pt'}</td></tr>`;
@@ -814,17 +821,17 @@ function drawNrr(key){
   const lossPend = Math.max(0, R.pend - R.pendExp);
   const pendChurnN = R.pend ? (CN.pend||0) * lossPend / R.pend : 0;   /* 未決着のうち解約になる見込みの社数（未決着の社数 × 解約見込みの金額の割合で近似） */
   const cFc = CN.n ? ((CN.churn||0) + pendChurnN)/CN.n : null, nFc = R.base ? (R.base - R.exp)/R.base : null;
-  const kDec = khead('確定') + kr('カスタマーチャーン', CHURN_GOAL, cDec, 1, 'カスタマーチャーン（社数）＝ 解約した社数 ÷ 更新対象の社数（決まった解約だけ）。目標の下は目標内に収まる解約の社数') + kr('NRC', NRC_GOAL, nDec, 2, 'NRC（ネットレベニューチャーン）＝（解約 ＋ ダウンセル － アップセル）÷ 更新対象の年額（決まった分だけ）') + '</tbody>';
+  const kDec = khead('確定') + kr('カスタマーチャーン', CHURN_GOAL, cDec, 1, 'カスタマーチャーン（社数）＝ 解約した社数（決まった解約だけ）÷ 更新対象の社数（未決着も含む全部）。目標の下は目標内に収まる解約の社数') + kr('NRC', NRC_GOAL, nDec, 2, 'NRC（ネットレベニューチャーン）＝（解約 ＋ ダウンセル － アップセル）÷ 更新対象の年額（未決着も含む全部。増減は決まった分だけ）') + '</tbody>';
   const kFc = khead('見通し') + kr('カスタマーチャーン', CHURN_GOAL, cFc, 1, 'カスタマーチャーン（社数・見通し）＝（解約した社数 ＋ 未決着のうち解約になる見込みの社数）÷ 更新対象の社数。見込みの社数＝未決着の社数 × 解約見込みの金額の割合（更新予定10%・危険80%・不明/空欄30%で重みづけ）') + kr('NRC', NRC_GOAL, nFc, 2, 'NRC（ネットレベニューチャーン・見通し）＝（更新対象 － 着地予測）÷ 更新対象の年額 ＝ 1 － 見通しNRR') + '</tbody>';
   document.getElementById('apK').innerHTML = `
     <div class="nb-grid">
       <div class="nb-card">
-        <div class="nb-t"><span><i class="ti ti-lock"></i> 確定 ${nv(R.nrr)}</span><span class="nb-q" data-tip="${esc(tip('確定（決まった分だけ）', '更新・解約が決まった契約の実績', `確定NRR ＝（更新して残ったARR ＋ アップセル）÷ 決着した契約の母数 ＝（${mn(R.kept)} ＋ ${mn(R.up)}）÷ ${mn(decB)} ＝ ${pct(R.nrr)}`, '年額＝契約金額を12か月に直した額（ARR）、月額＝年額÷12。更新済み＝更新が決まった契約の更新前の年額。アップセル・ダウンセル＝更新時の増減。'+(S.period==='月'?'単月はぶれやすいので、判断は四半期・半期・年間で':'')))}"></span></div>
+        <div class="nb-t"><span><i class="ti ti-lock"></i> 確定 ${nv(R.nrr)}</span><span class="nb-q" data-tip="${esc(tip('確定（決まった増減だけ）', '決まった解約・ダウンセル・アップセルだけを数えた実績', `確定NRR ＝ 1 － 確定NRC ＝（更新対象 － 解約 － ダウンセル ＋ アップセル）÷ 更新対象 ＝（${mn(R.base)} － ${mn(R.churn)} － ${mn(R.down)} ＋ ${mn(R.up)}）÷ ${mn(R.base)} ＝ ${pct(R.nrr)}。未決着（${mn(R.pend)}）はまだ減っていないものとして数える（共通ルールの式：÷更新対象金額）`, '年額＝契約金額を12か月に直した額（ARR）、月額＝年額÷12。更新済み＝更新が決まった契約の更新前の年額。アップセル・ダウンセル＝更新時の増減。'+(S.period==='月'?'単月はぶれやすいので、判断は四半期・半期・年間で':'')))}"></span></div>
         <div class="tbl-wrap"><table class="nb-tbl">${tblDec}</table></div>
         <div class="tbl-wrap" style="margin-top:6px"><table class="nb-tbl nb-kpi">${kDec}</table></div>
       </div>
       <div class="nb-card">
-        <div class="nb-t"><span><i class="ti ti-telescope"></i> 見通し（${endW}） ${nv(R.nrrFc)}</span><span class="nb-q" data-tip="${esc(tip(`${endW}の見通し`, '確定して残ったARR ＋ 未決着のうち残る見込み', `未決着の見込み ＝ 更新予定 ${mn(R.pPlan)}×0.9 ＋ 危険 ${mn(R.pDanger)}×0.2 ＋ 不明・空欄 ${mn(R.pOther)}×0.7 ＝ ${mn(R.pendExp)}`, '目標＝更新対象×94.36%。未決着の更新見込はCS管理の「更新見込」'))}"></span></div>
+        <div class="nb-t"><span><i class="ti ti-telescope"></i> 見通し（${endW}） ${nv(R.nrrFc)}</span><span class="nb-q" data-tip="${esc(tip(`${endW}の見通し`, '確定して残ったARR ＋ 未決着のうち残る見込み', `未決着の見込み ＝ 更新予定 ${mn(R.pPlan)}×0.9 ＋ 危険 ${mn(R.pDanger)}×0.2 ＋ 不明・空欄 ${mn(R.pOther)}×0.7 ＝ ${mn(R.pendExp)}`, `目標＝更新対象×${tPct()}（＝1－NRC目標 ${(NRC_TARGET*100).toFixed(2)}%・共通ルール）。未決着の更新見込はCS管理の「更新見込」`))}"></span></div>
         <div class="tbl-wrap"><table class="nb-tbl">${tblFc}</table></div>
         <div class="tbl-wrap" style="margin-top:6px"><table class="nb-tbl nb-kpi">${kFc}</table></div>
       </div>
@@ -851,13 +858,13 @@ function drawNrr(key){
   ob.onHover=(e,els)=>{ e.native.target.style.cursor = els.length && st[els[0].index].k!=='fc' ? 'pointer':'default'; };
   const tgt = { id:'wfTgt', afterDatasetsDraw(ch){ const c=ch.ctx, ys=ch.scales.y, xs=ch.scales.x, y=ys.getPixelForValue(R.target);
       c.save(); c.strokeStyle='#062A52'; c.setLineDash([5,4]); c.lineWidth=1.5; c.beginPath(); c.moveTo(ch.chartArea.left,y); c.lineTo(ch.chartArea.right,y); c.stroke();
-      c.setLineDash([]); c.fillStyle='#062A52'; c.font='bold 11px sans-serif'; c.textAlign='center'; c.fillText(`目標 ${mn(R.target)}（94.36%）`, xs.getPixelForValue(4), y-5);
+      c.setLineDash([]); c.fillStyle='#062A52'; c.font='bold 11px sans-serif'; c.textAlign='center'; c.fillText(`目標 ${mn(R.target)}（${tPct()}）`, xs.getPixelForValue(4), y-5);
       c.textAlign='center'; c.font='bold 12px sans-serif';
       [[5,R.nrr,'確定NRR'],[6,R.nrrFc,'見通しNRR']].forEach(([i,v,l])=>{ if(v==null) return; c.fillStyle = v>=NRR_TARGET?css('--success'):css('--danger');
         c.fillText(`${l} ${pct(v)}`, xs.getPixelForValue(i), ys.getPixelForValue(st[i].v)-8); });
       if(yMin>0){ c.fillStyle=css('--ink-faint'); c.font='10px sans-serif'; c.textAlign='left'; c.fillText(`※ 縦軸は ${mn(yMin)} から`, ch.chartArea.left+4, ch.chartArea.bottom-6); }
       c.restore(); } };
-  document.getElementById('wfTitle').textContent = `${P.short}のNRRブリッジ（目標 94.36%）`;
+  document.getElementById('wfTitle').textContent = `${P.short}のNRRブリッジ（目標 ${tPct()}）`;
   mk('cNB',{type:'bar',data:{labels:st.map(s=>s.lab),datasets:[{data:wd,backgroundColor:st.map(s=>s.col),borderColor:st.map(s=>s.dash?'#2575F0':'transparent'),borderWidth:st.map(s=>s.dash?2:0),borderDash:[4,3],borderRadius:6,borderSkipped:false}]},options:ob,plugins:[tgt]});
 }
 
@@ -868,12 +875,12 @@ function nrrDrawer(key, hi, kind){
   const tot = nrrStat(key, M.slice());
   const cl = ((D.closings||{})[key]) || {};
   const clNrr = ms => { const xs = ms.map(m=>cl[m]).filter(Boolean); if(xs.length!==ms.length || !xs.length) return null; const s = k=>xs.reduce((a,x)=>a+(x[k]||0),0);
-    const dec = s('base') - s('pend'); return dec>0 ? (s('renPost')+s('midUp')-s('midDown'))/dec : null; };
+    const b = s('base'); return b>0 ? (s('renPost')+s('midUp')-s('midDown')+s('pend'))/b : null; };   /* 2026-11-22：÷更新対象の全部（共通ルール） */
   const hasCl = Object.keys(cl).length>0;
   const cell = (i,k,v,cls) => `<td class="num ${cls||''}"><a class="nd" data-nd="${i}|${k}">${v}</a></td>`;
   const line = (i,lab,s,cls,ms) => { const c = hasCl ? clNrr(ms) : null;
     return `<tr class="${cls||''}"><td style="text-align:left">${lab}${s.fut?'<span class="ap-tag">見込</span>':''}</td>${cell(i,'base',man(s.base))}${cell(i,'ren',man(s.kept))}${cell(i,'up',s.up?'+'+man(s.up):'—','up')}${cell(i,'down',s.down?'−'+man(s.down):'—','dn')}${cell(i,'churn',s.churn?'−'+man(s.churn):'—','dn')}${cell(i,'pend',s.pend?man(s.pend):'—')}
-      <td class="num"><b class="${s.nrr==null?'':s.nrr>=NRR_TARGET?'up':'dn'}">${pct(s.nrr)}</b></td><td class="num">${man(s.exp)}</td><td class="num">${man(s.target)}</td><td class="num ${s.exp>=s.target?'up':'dn'}">${(s.exp>=s.target?'+':'−')+man(Math.abs(s.exp-s.target))}</td>${cell(i,'cross',s.cross?man(s.cross):'—','muted')}
+      <td class="num"><b class="${s.nrr==null?'':s.nrr>=1-nrcGoal(s.ms)?'up':'dn'}">${pct(s.nrr)}</b></td><td class="num">${man(s.exp)}</td><td class="num">${man(s.target)}</td><td class="num ${s.exp>=s.target?'up':'dn'}">${(s.exp>=s.target?'+':'−')+man(Math.abs(s.exp-s.target))}</td>${cell(i,'cross',s.cross?man(s.cross):'—','muted')}
       ${hasCl?`<td class="num">${c==null?'—':pct(c)}${c!=null&&s.nrr!=null&&Math.abs(c-s.nrr)>0.0005?`<div class="clchg">${s.nrr>c?'+':'−'}${(Math.abs(s.nrr-c)*100).toFixed(1)}pt</div>`:''}</td>`:''}</tr>`; };
   const body = rows.map((r,i)=>line(i, r.b.lab, r.s, i===hi?'sel':'', r.b.ms)).join('') + (rows.length>1 ? line(rows.length, kind==='月'||kind==='年'?'年間 計':'年間 計', tot, 'grp', M.slice()) : '');
   const title = `NRRの集計表（${{月:'月別',四半期:'四半期',半期:'半期',年:'年間'}[kind]}）`;
@@ -1203,16 +1210,16 @@ function render(){
     kpi(`${sh}のNRR`, pct(r.nrr), d(r.nrr,pv&&pv.nrr), r.nrr>=1?'b-ok':'b-warm',
       tip('NRR（売上継続率・期首ARR基準）', `（${pl}ARR ＋ アップセル － ダウンセル － 解約）÷ ${pl}ARR`,
         `=（${mn(r.open)} ＋ ${mn(r.up)} － ${mn(r.down)} － ${mn(r.churn)}）÷ ${mn(r.open)} = ${pct(r.nrr)}`, '新規は含めない。＝ 1 － NRC①')) +
-    kpi(`${sh}のNRR（更新ベース）`, pct(r.nrr2), `更新を迎えた契約 ${yen(r.n.dec)} が基準（永井式）`, r.nrr2>=1?'b-ok':'b-warm',
+    kpi(`${sh}のNRR（更新ベース）`, pct(r.nrr2), `更新を迎える契約 ${yen(r.n.tgt)} が基準（永井式）`, r.nrr2>=1?'b-ok':'b-warm',
       tip('NRR（更新ベース・永井式）', '（更新対象 ＋ アップセル － ダウンセル － 解約）÷ 更新対象',
-        `=（${mn(r.n.dec)} ＋ ${mn(r.n.up)} － ${mn(r.n.down)} － ${mn(r.n.churn)}）÷ ${mn(r.n.dec)} = ${pct(r.nrr2)}`,
-        '永井式：金額は年額（CS管理の金額 ÷ 契約月数 × 12）。更新対象＝満了して決着した契約（更新＋解約）。アップセル／ダウンセル＝次の契約との年額の差。期中の追加は入れない。＝ 1 － NRC')) +
+        `=（${mn(r.n.tgt)} ＋ ${mn(r.n.up)} － ${mn(r.n.down)} － ${mn(r.n.churn)}）÷ ${mn(r.n.tgt)} = ${pct(r.nrr2)}`,
+        '永井式：金額は年額（CS管理の金額 ÷ 契約月数 × 12）。更新対象＝期間中に満了する契約の全部（未決着も含む）。アップセル／ダウンセル＝次の契約との年額の差。期中の追加は集計の仕方が決まっていないため入れていない（I-073）。＝ 1 － NRC')) +
     kpi(`${sh}のNRC`, `${pct(r.nrc2,2)}<span style="font-size:14px;color:var(--ink-faint);font-weight:600"> ／ ${pct(r.nrc,1)}</span>`, '永井式（更新対象比） ／ ① 月初ARR比', 'b-warm',
       tip('NRC（ネットレベニューチャーン）', `永井式（解約 ＋ ダウンセル － アップセル）÷ 更新対象（年額・CS管理）\n①（解約 ＋ ダウンセル － アップセル）÷ ${pl}ARR（契約DB）`,
-        `永井式 =（${mn(r.n.churn)} ＋ ${mn(r.n.down)} － ${mn(r.n.up)}）÷ ${mn(r.n.dec)} = ${pct(r.nrc2,2)}\n① =（${mn(r.churn)} ＋ ${mn(r.down)} － ${mn(r.up)}）÷ ${mn(r.open)} = ${pct(r.nrc,1)}`,
+        `永井式 =（${mn(r.n.churn)} ＋ ${mn(r.n.down)} － ${mn(r.n.up)}）÷ ${mn(r.n.tgt)} = ${pct(r.nrc2,2)}\n① =（${mn(r.churn)} ＋ ${mn(r.down)} － ${mn(r.up)}）÷ ${mn(r.open)} = ${pct(r.nrc,1)}`,
         '永井式＝2026-10-30に決めたCSの評価の数え方。マイナスはアップセルが解約・ダウンセルを上回ったという意味（良い状態）')) +
-    kpi(`${sh}のレベニューチャーン`, pct(r.rc), `（解約＋ダウンセル）÷ 更新対象 ${yen(r.n.dec)}（永井式）`, 'b-bad',
-      tip('レベニューチャーンレート', '（解約 ＋ ダウンセル）÷ 更新前ARR', `=（${mn(r.churn)} ＋ ${mn(r.down)}）÷ ${mn(r.tgtArr)} = ${pct(r.rc)}`,
+    kpi(`${sh}のレベニューチャーン`, pct(r.rc), `（解約＋ダウンセル）÷ 更新対象 ${yen(r.n.tgt)}（永井式）`, 'b-bad',
+      tip('レベニューチャーンレート', '（解約 ＋ ダウンセル）÷ 更新対象（年額・CS管理）', `=（${mn(r.n.churn)} ＋ ${mn(r.n.down)}）÷ ${mn(r.n.tgt)} = ${pct(r.rc)}`,
         'アップセルを差し引かない、純粋に失った金額の割合')) +
     kpi(`${sh}のカスタマーチャーン①`, pct(r.cc1), `解約 ${r.churnIds} ／ 更新対象 ${r.tgtIds} ID`, 'b-bad',
       tip('カスタマーチャーンレート①', '解約ID数 ÷ 更新対象ID数', `= ${r.churnIds} ÷ ${r.tgtIds} = ${pct(r.cc1)}`,
